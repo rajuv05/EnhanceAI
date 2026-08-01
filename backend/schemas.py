@@ -22,6 +22,7 @@ class User(UserBase):
     id: int
     is_active: bool
     is_pro: bool
+    email_verified: bool
     created_at: datetime
 
     class Config:
@@ -43,6 +44,11 @@ class Task(TaskBase):
     progress: int
     original_path: str
     enhanced_path: Optional[str] = None
+    original_size: Optional[float] = None
+    enhanced_size: Optional[float] = None
+    original_resolution: Optional[str] = None
+    enhanced_resolution: Optional[str] = None
+    output_format: Optional[str] = None
     processing_time: Optional[float] = None
     created_at: datetime
 

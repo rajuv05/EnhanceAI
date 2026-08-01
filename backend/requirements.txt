@@ -12,3 +12,4 @@ pillow
 opencv-python-headless
 ffmpeg-python
 stripe
+alembic

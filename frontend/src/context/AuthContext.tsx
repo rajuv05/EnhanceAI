@@ -1,12 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { authService } from '../services/api'
 
+interface Toast {
+  message: string
+  type: 'success' | 'error'
+}
+
 interface AuthContextType {
   user: any | null
   loading: boolean
   isAuthenticated: boolean
   login: (token: string) => void
   logout: () => void
+  toast: Toast | null
+  showToast: (message: string, type: 'success' | 'error') => void
+  clearToast: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -14,6 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState<Toast | null>(null)
 
   const fetchUser = async () => {
     const token = localStorage.getItem('token')
@@ -48,8 +57,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.location.href = '/'
   }
 
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type })
+    setTimeout(() => {
+      setToast(null)
+    }, 5000)
+  }
+
+  const clearToast = () => setToast(null)
+
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      isAuthenticated: !!user,
+      login,
+      logout,
+      toast,
+      showToast,
+      clearToast
+    }}>
       {children}
     </AuthContext.Provider>
   )

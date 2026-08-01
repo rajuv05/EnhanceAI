@@ -1,45 +1,85 @@
-from PIL import Image, ImageEnhance, ImageFilter
-import os
+import subprocess
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ImageProcessor:
-    @staticmethod
-    def process(input_path: str, output_path: str, tool: str):
-        with Image.open(input_path) as img:
-            if tool == "resize":
-                # Upscale by 2x as a default for "resize" tool
-                w, h = img.size
-                img = img.resize((w * 2, h * 2), Image.Resampling.LANCZOS)
-            
-            elif tool == "sharpen":
-                img = img.filter(ImageFilter.SHARPEN)
-            
-            elif tool == "brightness":
-                enhancer = ImageEnhance.Brightness(img)
-                img = enhancer.enhance(1.5)
-            
-            elif tool == "contrast":
-                enhancer = ImageEnhance.Contrast(img)
-                img = enhancer.enhance(1.5)
-            
-            elif tool == "saturation":
-                enhancer = ImageEnhance.Color(img)
-                img = enhancer.enhance(1.5)
-            
-            elif tool == "optimize":
-                # Handled by save parameters
-                pass
-            
-            elif tool == "convert":
-                # Convert to PNG if it's not
-                if not output_path.lower().endswith('.png'):
-                    output_path = os.path.splitext(output_path)[0] + ".png"
-            
-            # Save with optimization
-            save_args = {"optimize": True}
-            if output_path.lower().endswith(('.jpg', '.jpeg')):
-                save_args["quality"] = 85
-            
-            img.save(output_path, **save_args)
-            return output_path
+    def _run_ffmpeg(self, cmd: list):
+        try:
+            logger.info(f"Running Image FFmpeg: {' '.join(cmd)}")
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Image FFmpeg error: {e.stderr}")
+            raise Exception(f"Processing failed: {e.stderr}")
+
+    def resize(self, input_path: str, output_path: str):
+        # 2x upscale using Lanczos
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "scale=iw*2:ih*2:flags=lanczos", output_path]
+        return self._run_ffmpeg(cmd)
+
+    def sharpen(self, input_path: str, output_path: str):
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "unsharp=5:5:1.0:5:5:0.0", output_path]
+        return self._run_ffmpeg(cmd)
+
+    def brightness(self, input_path: str, output_path: str, level: float = 0.1):
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=brightness={level}", output_path]
+        return self._run_ffmpeg(cmd)
+
+    def contrast(self, input_path: str, output_path: str, level: float = 1.3):
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=contrast={level}", output_path]
+        return self._run_ffmpeg(cmd)
+
+    def saturation(self, input_path: str, output_path: str, level: float = 1.5):
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=saturation={level}", output_path]
+        return self._run_ffmpeg(cmd)
+
+    def optimize(self, input_path: str, output_path: str):
+        # Quality 4 is a good balance for JPEG, PNG uses compression_level
+        cmd = ["ffmpeg", "-y", "-i", input_path]
+        if output_path.lower().endswith(('.jpg', '.jpeg')):
+            cmd += ["-q:v", "4"]
+        elif output_path.lower().endswith('.png'):
+            cmd += ["-compression_level", "9"]
+        cmd.append(output_path)
+        return self._run_ffmpeg(cmd)
+
+    def convert(self, input_path: str, output_path: str):
+        cmd = ["ffmpeg", "-y", "-i", input_path, output_path]
+        return self._run_ffmpeg(cmd)
+
+    def crop(self, input_path: str, output_path: str):
+        # Center square crop
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "crop='min(iw,ih)':'min(iw,ih)'", output_path]
+        return self._run_ffmpeg(cmd)
+
+    def rotate(self, input_path: str, output_path: str, direction: int = 1):
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"transpose={direction}", output_path]
+        return self._run_ffmpeg(cmd)
+
+    def flip(self, input_path: str, output_path: str, mode: str = "h"):
+        # h = horizontal, v = vertical
+        vf = "hflip" if mode == "h" else "vflip"
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", vf, output_path]
+        return self._run_ffmpeg(cmd)
+
+    def blur(self, input_path: str, output_path: str, sigma: int = 10):
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"boxblur={sigma}:1", output_path]
+        return self._run_ffmpeg(cmd)
+
+    def watermark(self, input_path: str, output_path: str, text: str = "EnhanceAI"):
+        cmd = [
+            "ffmpeg", "-y", "-i", input_path, 
+            "-vf", f"drawtext=text='{text}':x=10:y=H-th-10:fontcolor=white:fontsize=48:shadowcolor=black:shadowx=2:shadowy=2",
+            output_path
+        ]
+        return self._run_ffmpeg(cmd)
+
+    def process(self, input_path: str, output_path: str, tool: str):
+        method = getattr(self, tool, None)
+        if method:
+            return method(input_path, output_path)
+        else:
+            return self.optimize(input_path, output_path)
 
 image_processor = ImageProcessor()

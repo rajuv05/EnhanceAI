@@ -38,6 +38,18 @@ export const authService = {
     return response.data;
   },
 
+  resendVerification: async (email: string) => {
+    const formData = new FormData();
+    formData.append("email", email);
+    const response = await api.post("/resend-verification", formData);
+    return response.data;
+  },
+
+  verifyEmail: async (token: string) => {
+    const response = await api.get(`/verify-email?token=${token}`);
+    return response.data;
+  },
+
   logout: () => {
     localStorage.removeItem("token");
   },
@@ -70,6 +82,11 @@ export const taskService = {
 
   getTask: async (id: number) => {
     const response = await api.get(`/tasks/${id}`);
+    return response.data;
+  },
+
+  deleteTask: async (id: number) => {
+    const response = await api.delete(`/tasks/${id}`);
     return response.data;
   },
 };

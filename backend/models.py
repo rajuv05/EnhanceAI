@@ -1,8 +1,11 @@
 import datetime
+import enum
+
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Float
 from sqlalchemy.orm import relationship
+
 from database import Base
-import enum
+
 
 class TaskStatus(str, enum.Enum):
     PENDING = "pending"
@@ -17,7 +20,15 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String)
     hashed_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=False)
+    email_verified = Column(Boolean, default=False)
+    verification_token = Column(String, nullable=True)
+
+
+    verification_expiry = Column(
+    DateTime(timezone=True),
+    nullable=True
+)
     stripe_customer_id = Column(String, nullable=True)
     is_pro = Column(Boolean, default=False)
     subscription_id = Column(String, nullable=True)
@@ -37,6 +48,11 @@ class EnhancementTask(Base):
     progress = Column(Integer, default=0)
     original_path = Column(String)
     enhanced_path = Column(String, nullable=True)
+    original_size = Column(Float, nullable=True)
+    enhanced_size = Column(Float, nullable=True)
+    original_resolution = Column(String, nullable=True)
+    enhanced_resolution = Column(String, nullable=True)
+    output_format = Column(String, nullable=True)
     processing_time = Column(Float, nullable=True)
     error_message = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
