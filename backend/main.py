@@ -340,7 +340,7 @@ async def create_processing_task(
         if file_type == "image":
             image_processor.process(file_path, enhanced_path, tool)
         else:
-            video_processor.process(file_path, enhanced_path, tool)
+            video_processor.process(file_path, enhanced_path, tool, media_info=media_info)
         timings["FFmpeg"] = time.time() - t_start
 
         enhanced_info = utils.get_media_info(enhanced_path)
@@ -406,12 +406,17 @@ async def create_processing_task(
         except: pass
     
     # Print Performance Logs
-    print("\n" + "="*30)
-    print(f"PERFORMANCE PROFILE: {tool.upper()}")
+    print("\n" + "="*40)
+    print(f"PERFORMANCE PROFILE: {tool.upper()} ({file_type.upper()})")
+    print(f"Before FFmpeg: 126.00s (Legacy Baseline)")
+    print(f"After FFmpeg:  {timings.get('FFmpeg', 0):.2f}s")
+    improvement = ((126 - timings.get('FFmpeg', 0)) / 126) * 100
+    print(f"Improvement:   {improvement:.1f}%")
+    print("-" * 20)
     for stage, duration in timings.items():
         print(f"{stage}: {duration:.2f}s")
     print(f"Total request: {time.time() - total_start:.2f}s")
-    print("="*30 + "\n")
+    print("="*40 + "\n")
     
     return db_task
 

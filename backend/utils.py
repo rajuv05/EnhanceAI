@@ -69,15 +69,17 @@ def get_media_info(file_path: str):
             "format": data.get("format", {}).get("format_name"),
             "width": None,
             "height": None,
-            "resolution": None
+            "resolution": None,
+            "audio_codec": None
         }
         
         for stream in data.get("streams", []):
-            if stream.get("width") and stream.get("height"):
+            if stream.get("codec_type") == "video" and not info["width"]:
                 info["width"] = stream["width"]
                 info["height"] = stream["height"]
                 info["resolution"] = f"{stream['width']}x{stream['height']}"
-                break
+            elif stream.get("codec_type") == "audio":
+                info["audio_codec"] = stream.get("codec_name")
         
         return info
     except Exception as e:
