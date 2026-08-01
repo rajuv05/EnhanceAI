@@ -207,8 +207,8 @@ export const Pricing = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {[
-            { n: 'Free', p: '₹0', d: 'Essential tools for casual creators.', f: ['10 tasks / day', '100MB max file size', 'Standard processing speed', 'Watermark included'] },
-            { n: 'Pro', p: '₹29', s: '/month', d: 'Power users and professionals.', f: ['Unlimited tasks', '2GB max file size', 'Priority processing', 'No watermarks', 'Customer Portal access'], popular: true },
+            { n: 'Free', p: '₹0', d: 'Essential tools for casual creators.', f: ['10 tasks / day', '100MB max file size', 'Standard processing speed'] },
+            { n: 'Pro', p: '₹29', s: '/month', d: 'Power users and professionals.', f: ['Unlimited tasks', '2GB max file size', 'Priority processing', 'Customer Portal access'], popular: true },
             { n: 'Lifetime', p: '₹499', d: 'One-time payment, permanent access.', f: ['Everything in Pro', 'Pay once, use forever', 'Early access to AI tools', 'Priority support'] }
           ].map((plan) => {
             const isCurrent = user?.subscription_plan === plan.n.toLowerCase()
@@ -563,12 +563,6 @@ export const Dashboard = () => {
 
                       {file && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-                          {user?.subscription_plan === 'free' && (
-                            <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 flex items-center space-x-2">
-                              <AlertCircle size={16} className="text-orange-400" />
-                              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Free Plan: Watermark will be applied</span>
-                            </div>
-                          )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                               <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Choose Tool</label>

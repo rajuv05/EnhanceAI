@@ -67,7 +67,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onU
                   {[
                     "Unlimited daily processing",
                     "2GB maximum file size support",
-                    "No watermarks on media",
                     "Priority server access",
                     "Unlimited history"
                   ].map((f, i) => (

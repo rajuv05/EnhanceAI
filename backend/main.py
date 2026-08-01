@@ -322,9 +322,6 @@ async def create_processing_task(
     start_time = time.time()
     try:
         base, ext = os.path.splitext(file.filename)
-        if tool == "gif": ext = ".gif"
-        elif tool == "extract_audio": ext = ".mp3"
-        elif tool == "thumbnail": ext = ".jpg"
         
         enhanced_filename = f"proc_{uuid.uuid4()}{ext}"
         enhanced_path = os.path.join("uploads/enhanced", enhanced_filename)
