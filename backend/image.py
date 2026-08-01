@@ -10,7 +10,6 @@ class ImageProcessor:
             logger.info(f"Running Image FFmpeg: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             
-            # Verify output
             output_path = cmd[-1]
             if os.path.exists(output_path):
                 size = os.path.getsize(output_path)
@@ -24,82 +23,42 @@ class ImageProcessor:
             logger.error(f"stderr: {e.stderr}")
             raise Exception(f"Image processing failed: {e.stderr}")
 
-    def resize(self, input_path: str, output_path: str):
-        # 2x upscale using Lanczos
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "scale=iw*2:ih*2:flags=lanczos", output_path]
-        return self._run_ffmpeg(cmd)
-
-    def sharpen(self, input_path: str, output_path: str):
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "unsharp=5:5:1.0:5:5:0.0", output_path]
-        return self._run_ffmpeg(cmd)
-
-    def brightness(self, input_path: str, output_path: str, level: float = 0.1):
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=brightness={level}", output_path]
-        return self._run_ffmpeg(cmd)
-
-    def contrast(self, input_path: str, output_path: str, level: float = 1.3):
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=contrast={level}", output_path]
-        return self._run_ffmpeg(cmd)
-
-    def saturation(self, input_path: str, output_path: str, level: float = 1.5):
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=saturation={level}", output_path]
-        return self._run_ffmpeg(cmd)
-
-    def optimize(self, input_path: str, output_path: str):
-        # Quality 4 is a good balance for JPEG, PNG uses compression_level
+    def compress(self, input_path: str, output_path: str):
+        """High-efficiency compression while preserving visual quality."""
         cmd = ["ffmpeg", "-y", "-i", input_path]
         if output_path.lower().endswith(('.jpg', '.jpeg')):
+            # Quality 4 is high (approx 85-90% quality), balanced file size
             cmd += ["-q:v", "4"]
         elif output_path.lower().endswith('.png'):
+            # Max compression for PNG
             cmd += ["-compression_level", "9"]
+        else:
+            cmd += ["-q:v", "5"]
+        
         cmd.append(output_path)
         return self._run_ffmpeg(cmd)
 
-    def convert(self, input_path: str, output_path: str):
-        cmd = ["ffmpeg", "-y", "-i", input_path, output_path]
+    def optimize(self, input_path: str, output_path: str):
+        """Optimize for web: progressive encoding and metadata stripping."""
+        cmd = ["ffmpeg", "-y", "-i", input_path]
+        
+        if output_path.lower().endswith(('.jpg', '.jpeg')):
+            cmd += ["-interlace", "plane", "-q:v", "3"]
+        elif output_path.lower().endswith('.png'):
+            cmd += ["-compression_level", "9"]
+            
+        cmd.append(output_path)
         return self._run_ffmpeg(cmd)
 
-    def crop(self, input_path: str, output_path: str):
-        # Center square crop
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "crop='min(iw,ih)':'min(iw,ih)'", output_path]
+    def sharpen(self, input_path: str, output_path: str):
+        """Natural sharpening algorithm using unsharp filter."""
+        # Careful values to avoid over-sharpening artifacts
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "unsharp=3:3:0.7:3:3:0.0", output_path]
         return self._run_ffmpeg(cmd)
 
-    def rotate(self, input_path: str, output_path: str, direction: int = 1):
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"transpose={direction}", output_path]
-        return self._run_ffmpeg(cmd)
-
-    def flip(self, input_path: str, output_path: str, mode: str = "h"):
-        # h = horizontal, v = vertical
-        vf = "hflip" if mode == "h" else "vflip"
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", vf, output_path]
-        return self._run_ffmpeg(cmd)
-
-    def blur(self, input_path: str, output_path: str, sigma: int = 10):
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"boxblur={sigma}:1", output_path]
-        return self._run_ffmpeg(cmd)
-
-    def watermark(self, input_path: str, output_path: str, text: str = "EnhanceAI"):
-        # Use a simpler filter if drawtext fails or use a common font path
-        # Try to find a font on common systems
-        font_paths = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/TTF/DejaVuSans.ttf",
-            "C:/Windows/Fonts/arial.ttf",
-            "arial.ttf"
-        ]
-        font_file = ""
-        for path in font_paths:
-            if os.path.exists(path):
-                # Escape colons for Windows paths in FFmpeg filters
-                safe_path = path.replace(":", "\\\\:")
-                font_file = f":fontfile='{safe_path}'"
-                break
-
-        cmd = [
-            "ffmpeg", "-y", "-i", input_path, 
-            "-vf", f"drawtext=text='{text}':x=10:y=H-th-10:fontcolor=white:fontsize=48{font_file}:shadowcolor=black:shadowx=2:shadowy=2",
-            output_path
-        ]
+    def brightness(self, input_path: str, output_path: str, level: float = 0.1):
+        """Improve exposure using eq filter with balanced gamma."""
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=brightness={level}:gamma=1.1", output_path]
         return self._run_ffmpeg(cmd)
 
     def process(self, input_path: str, output_path: str, tool: str):

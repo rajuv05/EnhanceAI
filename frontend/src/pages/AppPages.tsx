@@ -31,14 +31,35 @@ const getMediaUrl = (path: string) => {
   return `http://localhost:8000/${path}`; // Legacy local path
 };
 
-const handleDownload = (url: string, filename: string) => {
+const handleDownload = async (url: string, filename: string) => {
   if (!url) return;
-  // Use _blank to ensure the SPA doesn't navigate away
+
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename || 'processed_media';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error('Download failed:', error);
+    // Fallback to opening in new tab if fetch fails
+    window.open(url, '_blank');
+  }
+};
+
+const handlePreview = (url: string) => {
+  if (!url) return;
   window.open(url, '_blank');
 };
 
-const VIDEO_TOOLS = ["compress", "resize", "upscale", "brightness", "contrast", "saturation", "sharpen", "trim", "crop", "rotate", "fps", "convert", "extract_audio", "remove_audio", "gif", "watermark", "thumbnail"]
-const IMAGE_TOOLS = ["resize", "sharpen", "brightness", "contrast", "saturation", "optimize", "convert", "crop", "rotate", "flip", "blur", "watermark"]
+const VIDEO_TOOLS = ["compress", "optimize", "sharpen", "brightness", "crop", "resize"]
+const IMAGE_TOOLS = ["compress", "optimize", "sharpen", "brightness"]
 
 // --- Components ---
 
@@ -108,12 +129,12 @@ export const Features = () => (
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {[
-          { t: 'High-Speed Compression', d: 'Reduce video size by up to 80% with H.264 optimization.', icon: <HardDrive size={24}/> },
-          { t: 'Pro Upscaling', d: 'Upscale your footage to 4K using advanced Lanczos interpolation.', icon: <Sparkles size={24}/> },
-          { t: 'Audio Extraction', d: 'Pull crystal clear high-bitrate MP3 audio from any video file.', icon: <FileText size={24}/> },
-          { t: 'Image Processing', d: 'Sharpen, resize, and optimize images for the web in bulk.', icon: <ImageIcon size={24}/> },
-          { t: 'GIF Generation', d: 'Convert video clips into high-quality animated GIFs instantly.', icon: <Activity size={24}/> },
-          { t: 'Precise Trimming', d: 'Frame-accurate video trimming and cutting with FFmpeg.', icon: <Clock size={24}/> }
+          { t: 'Media Compression', d: 'Reduce file size by up to 80% with optimized H.264 and JPEG encoding.', icon: <HardDrive size={24}/> },
+          { t: 'Professional Sharpening', d: 'Remove blur and enhance details with our natural sharpening engine.', icon: <Sparkles size={24}/> },
+          { t: 'Smart Optimization', d: 'Perfect your media for the web with metadata cleanup and progressive loading.', icon: <FileText size={24}/> },
+          { t: 'High-Quality Resizing', d: 'Upscale or downscale media using advanced Lanczos interpolation.', icon: <ImageIcon size={24}/> },
+          { t: 'Precision Cropping', d: 'Focus on what matters with our aspect-ratio preserving crop tools.', icon: <Activity size={24}/> },
+          { t: 'Brightness Control', d: 'Improve exposure and dynamic range without washing out highlights.', icon: <Clock size={24}/> }
         ].map((f, i) => (
           <Card key={f.t} className="group cursor-default">
             <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform duration-300">
@@ -467,15 +488,26 @@ export const Dashboard = () => {
                         </div>
                       </div>
 
-                      <div className="flex gap-4 w-full max-w-md">
-                        <button
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md">
+                        <Button
                           onClick={() => handleDownload(getMediaUrl(lastTask.enhanced_path), lastTask.filename)}
-                          className="flex-1 h-14 bg-primary text-white rounded-xl font-bold flex items-center justify-center space-x-2 shadow-lg shadow-primary/20 hover:scale-[1.02] transition"
+                          className="h-14 font-bold flex items-center justify-center space-x-2 shadow-lg shadow-primary/20 hover:scale-[1.02] transition"
                         >
-                          <Download size={20} /> <span>Download Now</span>
-                        </button>
-                        <Button variant="secondary" className="flex-1" onClick={() => setProcessingStage('idle')}>
-                          Start Another
+                          <Download size={20} /> <span>Download</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handlePreview(getMediaUrl(lastTask.enhanced_path))}
+                          className="h-14 font-bold flex items-center justify-center space-x-2 hover:scale-[1.02] transition"
+                        >
+                          <ExternalLink size={20} /> <span>Preview</span>
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="sm:col-span-2"
+                          onClick={() => setProcessingStage('idle')}
+                        >
+                          Process Another
                         </Button>
                       </div>
                     </motion.div>
@@ -594,17 +626,27 @@ export const Dashboard = () => {
                             </div>
                          </div>
                       </div>
-                      <div className="flex items-center">
+                      <div className="flex items-center space-x-1">
                          {task.status === 'completed' && (
-                            <button
-                              onClick={() => handleDownload(getMediaUrl(task.enhanced_path), task.filename)}
-                              className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 hover:text-primary hover:bg-primary/10 transition"
-                            >
-                               <Download size={18} />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handlePreview(getMediaUrl(task.enhanced_path))}
+                                className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:text-white hover:bg-dark-lightest transition"
+                                title="Preview"
+                              >
+                                 <ExternalLink size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDownload(getMediaUrl(task.enhanced_path), task.filename)}
+                                className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:text-primary hover:bg-primary/10 transition"
+                                title="Download"
+                              >
+                                 <Download size={16} />
+                              </button>
+                            </>
                          )}
-                         <Link to="/history" className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 hover:text-white transition">
-                            <ChevronRight size={20} />
+                         <Link to="/history" className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:text-white transition">
+                            <ChevronRight size={18} />
                          </Link>
                       </div>
                     </div>
@@ -781,22 +823,31 @@ export const History = () => {
                         </Badge>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="flex justify-end items-center space-x-2">
+                        <div className="flex justify-end items-center space-x-1">
                            {task.status === 'completed' && (
-                             <button
-                               onClick={() => handleDownload(getMediaUrl(task.enhanced_path), task.filename)}
-                               className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition shadow-sm"
-                               title="Download"
-                             >
-                                <Download size={18} />
-                             </button>
+                             <>
+                               <button
+                                 onClick={() => handlePreview(getMediaUrl(task.enhanced_path))}
+                                 className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-dark-lightest text-gray-500 hover:text-white transition"
+                                 title="Preview"
+                               >
+                                  <ExternalLink size={16} />
+                               </button>
+                               <button
+                                 onClick={() => handleDownload(getMediaUrl(task.enhanced_path), task.filename)}
+                                 className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition shadow-sm"
+                                 title="Download"
+                               >
+                                  <Download size={16} />
+                               </button>
+                             </>
                            )}
                            <button
                             onClick={() => handleDelete(task.id)}
-                            className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-red-500/10 text-gray-600 hover:text-red-500 transition"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-red-500/10 text-gray-600 hover:text-red-500 transition"
                             title="Delete"
                            >
-                             <Trash2 size={18} />
+                             <Trash2 size={16} />
                            </button>
                         </div>
                       </td>

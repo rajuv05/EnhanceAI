@@ -335,25 +335,6 @@ async def create_processing_task(
         else:
             video_processor.process(file_path, enhanced_path, tool)
 
-        # 4. Apply Watermark for free users
-        if not is_pro and tool not in ["extract_audio", "remove_audio", "thumbnail", "watermark"]:
-            if os.path.exists(enhanced_path):
-                temp_path = enhanced_path + ".pre-wm" + ext
-                try:
-                    os.rename(enhanced_path, temp_path)
-                    if file_type == "image":
-                        image_processor.watermark(temp_path, enhanced_path)
-                    else:
-                        video_processor.watermark(temp_path, enhanced_path)
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
-                except Exception as wm_err:
-                    logger.error(f"Watermark failed, reverting to unwatermarked: {wm_err}")
-                    if os.path.exists(temp_path) and not os.path.exists(enhanced_path):
-                        os.rename(temp_path, enhanced_path)
-            else:
-                logger.error("Enhanced path does not exist, skipping watermark")
-            
         enhanced_info = utils.get_media_info(enhanced_path)
 
         # Final validation and Cloudinary Upload
