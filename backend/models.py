@@ -31,10 +31,25 @@ class User(Base):
 )
     stripe_customer_id = Column(String, nullable=True)
     is_pro = Column(Boolean, default=False)
+    subscription_plan = Column(String, default="free") # free, pro, lifetime
+    subscription_status = Column(String, default="active") # active, trialing, past_due, canceled
     subscription_id = Column(String, nullable=True)
+    subscription_end = Column(DateTime, nullable=True)
+    cancel_at_period_end = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
 
     tasks = relationship("EnhancementTask", back_populates="owner")
+    usage = relationship("UserUsage", back_populates="owner", uselist=False)
+
+class UserUsage(Base):
+    __tablename__ = "user_usage"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    count_today = Column(Integer, default=0)
+    last_reset = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    total_count = Column(Integer, default=0)
+    
+    owner = relationship("User", back_populates="usage")
 
 class EnhancementTask(Base):
     __tablename__ = "tasks"

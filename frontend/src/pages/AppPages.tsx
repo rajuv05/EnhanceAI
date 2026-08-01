@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button, Card, Loader, Input, Badge, Skeleton } from '../components/UI'
+import { UpgradeModal } from '../components/SubscriptionModals'
 import { motion, AnimatePresence } from 'framer-motion'
-import { taskService, paymentService, authService } from '../services/api'
+import { taskService, paymentService, authService, usageService } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { Navigate, useSearchParams, Link, useNavigate } from 'react-router-dom'
 import {
   Download, Trash2, Clock, HardDrive, FileText, CheckCircle,
   AlertCircle, Upload, ChevronRight, Search, Filter,
   ArrowRight, Sparkles, Image as ImageIcon, Video as VideoIcon,
-  Activity, X
+  Activity, X, CreditCard, ExternalLink
 } from 'lucide-react'
 
 // --- Helpers ---
@@ -39,46 +40,49 @@ const PageTransition = ({ children }: { children: React.ReactNode }) => (
   </motion.div>
 )
 
-export const Home = () => (
-  <PageTransition>
-    <div className="container mx-auto px-4 py-20 md:py-32 flex flex-col items-center">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="mb-8 p-3 px-6 bg-primary/10 rounded-full border border-primary/20 flex items-center space-x-2"
-      >
-        <Sparkles size={18} className="text-primary" />
-        <span className="text-primary font-bold text-sm tracking-wide uppercase">New: FFmpeg Powered Engine</span>
-      </motion.div>
+export const Home = () => {
+  const navigate = useNavigate()
+  return (
+    <PageTransition>
+      <div className="container mx-auto px-4 py-20 md:py-32 flex flex-col items-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="mb-8 p-3 px-6 bg-primary/10 rounded-full border border-primary/20 flex items-center space-x-2"
+        >
+          <Sparkles size={18} className="text-primary" />
+          <span className="text-primary font-bold text-sm tracking-wide uppercase">New: FFmpeg Powered Engine</span>
+        </motion.div>
 
-      <h1 className="text-5xl md:text-8xl font-black mb-8 leading-tight tracking-tighter text-center max-w-4xl">
-        Transform your media <br />
-        <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400">with precision.</span>
-      </h1>
+        <h1 className="text-5xl md:text-8xl font-black mb-8 leading-tight tracking-tighter text-center max-w-4xl">
+          Transform your media <br />
+          <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400">with precision.</span>
+        </h1>
 
-      <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto text-center font-medium leading-relaxed">
-        Professional image and video processing. Compress, upscale, and transform your media in seconds using powerful open-source engines.
-      </p>
+        <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto text-center font-medium leading-relaxed">
+          Professional image and video processing. Compress, upscale, and transform your media in seconds using powerful open-source engines.
+        </p>
 
-      <div className="flex flex-col sm:flex-row justify-center gap-6 w-full max-w-md px-4">
-        <Button size="lg" className="w-full sm:w-auto min-w-[200px]" onClick={() => window.location.href='/dashboard'}>
-          Launch Dashboard <ChevronRight className="ml-2" size={20} />
-        </Button>
-        <Button variant="secondary" size="lg" className="w-full sm:w-auto min-w-[200px]" onClick={() => window.location.href='/pricing'}>
-          View Pricing
-        </Button>
+        <div className="flex flex-col sm:flex-row justify-center gap-6 w-full max-w-md px-4">
+          <Button size="lg" className="w-full sm:w-auto min-w-[200px]" onClick={() => navigate('/dashboard')}>
+            Launch Dashboard <ChevronRight className="ml-2" size={20} />
+          </Button>
+          <Button variant="secondary" size="lg" className="w-full sm:w-auto min-w-[200px]" onClick={() => navigate('/pricing')}>
+            View Pricing
+          </Button>
+        </div>
+
+        <div className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 opacity-50 grayscale hover:opacity-100 transition-all duration-500">
+           <div className="font-black text-2xl tracking-tighter">FFMPEG</div>
+           <div className="font-black text-2xl tracking-tighter italic">PILLOW</div>
+           <div className="font-black text-2xl tracking-tighter">POSTGRES</div>
+           <div className="font-black text-2xl tracking-tighter italic">REDIS</div>
+        </div>
       </div>
-
-      <div className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 opacity-50 grayscale hover:opacity-100 transition-all duration-500">
-         <div className="font-black text-2xl tracking-tighter">FFMPEG</div>
-         <div className="font-black text-2xl tracking-tighter italic">PILLOW</div>
-         <div className="font-black text-2xl tracking-tighter">POSTGRES</div>
-         <div className="font-black text-2xl tracking-tighter italic">REDIS</div>
-      </div>
-    </div>
-  </PageTransition>
-)
+    </PageTransition>
+  )
+}
 
 export const Features = () => (
   <PageTransition>
@@ -111,14 +115,46 @@ export const Features = () => (
 
 export const Pricing = () => {
   const [loading, setLoading] = useState<string | null>(null)
-  const { showToast } = useAuth()
+  const { user, showToast } = useAuth()
 
   const handleSubscribe = async (plan: string) => {
-    if (plan !== 'Pro') return
-    setLoading('Pro')
+    if (plan === 'Free') return
+    const planKey = plan.toLowerCase()
+    setLoading(planKey)
     try {
-      const res = await paymentService.createCheckoutSession()
-      window.location.href = res.url
+      const order = await paymentService.createOrder(planKey)
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || "",
+        amount: order.amount,
+        currency: order.currency,
+        name: "EnhanceAI",
+        description: `${plan} Plan Subscription`,
+        order_id: order.id,
+        handler: async (response: any) => {
+          try {
+            await paymentService.verifyPayment(
+              response.razorpay_order_id,
+              response.razorpay_payment_id,
+              response.razorpay_signature
+            )
+            showToast("Payment Successful!", "success")
+            window.location.reload()
+          } catch (err) {
+            showToast("Verification failed", "error")
+          }
+        },
+        prefill: {
+          name: user?.full_name,
+          email: user?.email,
+        },
+        theme: {
+          color: "#3b82f6",
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (err: any) {
       showToast(err.response?.data?.detail || "Failed to initiate checkout", "error")
     } finally {
@@ -135,34 +171,41 @@ export const Pricing = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {[
-            { n: 'Free', p: '$0', d: 'Essential tools for casual creators.', f: ['10 tasks / month', '50MB max file size', 'Basic support'] },
-            { n: 'Pro', p: '$19', d: 'Power users and professionals.', f: ['Unlimited tasks', '2GB max file size', 'Batch processing', 'Priority queue'], popular: true },
-            { n: 'Enterprise', p: 'Custom', d: 'High-volume business needs.', f: ['Custom API access', 'Dedicated server', 'SLA guaranteed', 'Team accounts'] }
-          ].map((plan) => (
-            <Card key={plan.n} className={plan.popular ? 'border-primary ring-2 ring-primary ring-offset-8 ring-offset-dark scale-105 z-10' : ''}>
-              {plan.popular && <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-black uppercase px-3 py-1 rounded-bl-xl tracking-widest">Most Popular</div>}
-              <div className="mb-8">
-                <h3 className="text-xl font-bold text-gray-400 mb-2">{plan.n}</h3>
-                <div className="text-5xl font-black text-white">{plan.p}</div>
-                <p className="text-sm text-gray-500 mt-4 font-medium">{plan.d}</p>
-              </div>
-              <ul className="space-y-4 mb-10">
-                {plan.f.map(feature => (
-                  <li key={feature} className="flex items-center text-sm font-semibold text-gray-300">
-                    <CheckCircle className="text-primary mr-3" size={18} /> {feature}
-                  </li>
-                ))}
-              </ul>
-              <Button
-                variant={plan.popular ? 'primary' : 'outline'}
-                className="w-full"
-                isLoading={loading === plan.n}
-                onClick={() => handleSubscribe(plan.n)}
-              >
-                {plan.n === 'Enterprise' ? 'Contact Sales' : plan.n === 'Free' ? 'Current Plan' : 'Get Started Now'}
-              </Button>
-            </Card>
-          ))}
+            { n: 'Free', p: '₹0', d: 'Essential tools for casual creators.', f: ['10 tasks / day', '100MB max file size', 'Standard processing speed', 'Watermark included'] },
+            { n: 'Pro', p: '₹29', s: '/month', d: 'Power users and professionals.', f: ['Unlimited tasks', '2GB max file size', 'Priority processing', 'No watermarks', 'Customer Portal access'], popular: true },
+            { n: 'Lifetime', p: '₹499', d: 'One-time payment, permanent access.', f: ['Everything in Pro', 'Pay once, use forever', 'Early access to AI tools', 'Priority support'] }
+          ].map((plan) => {
+            const isCurrent = user?.subscription_plan === plan.n.toLowerCase()
+            return (
+              <Card key={plan.n} className={plan.popular ? 'border-primary ring-2 ring-primary ring-offset-8 ring-offset-dark scale-105 z-10' : ''}>
+                {plan.popular && <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-black uppercase px-3 py-1 rounded-bl-xl tracking-widest">Most Popular</div>}
+                <div className="mb-8">
+                  <h3 className="text-xl font-bold text-gray-400 mb-2">{plan.n}</h3>
+                  <div className="flex items-baseline">
+                    <span className="text-5xl font-black text-white">{plan.p}</span>
+                    {plan.s && <span className="text-gray-500 ml-2 font-bold uppercase tracking-widest text-xs">{plan.s}</span>}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-4 font-medium">{plan.d}</p>
+                </div>
+                <ul className="space-y-4 mb-10">
+                  {plan.f.map(feature => (
+                    <li key={feature} className="flex items-center text-sm font-semibold text-gray-300">
+                      <CheckCircle className="text-primary mr-3 shrink-0" size={18} /> {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  variant={plan.popular ? 'primary' : 'outline'}
+                  className="w-full"
+                  isLoading={loading === plan.n.toLowerCase()}
+                  disabled={isCurrent}
+                  onClick={() => handleSubscribe(plan.n)}
+                >
+                  {isCurrent ? 'Current Plan' : plan.n === 'Free' ? 'Choose Free' : `Upgrade to ${plan.n}`}
+                </Button>
+              </Card>
+            )
+          })}
         </div>
       </div>
     </PageTransition>
@@ -173,17 +216,18 @@ export const Pricing = () => {
 
 export const Dashboard = () => {
   const [file, setFile] = useState<File | null>(null)
-  const [fileInfo, setFileInfo] = useState<{ res?: string, duration?: string } | null>(null)
   const [tool, setTool] = useState("optimize")
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingStage, setProcessingStage] = useState<'uploading' | 'analyzing' | 'processing' | 'finalizing' | 'completed' | 'idle'>('idle')
   const [tasks, setTasks] = useState<any[]>([])
   const [lastTask, setLastTask] = useState<any>(null)
-  const { showToast } = useAuth()
+  const [usage, setUsage] = useState<any>(null)
+  const [upgradeReason, setUpgradeReason] = useState<string>("")
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
+  const [paymentLoading, setPaymentLoading] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchTasks()
-  }, [])
+  const { user, showToast } = useAuth()
+  const navigate = useNavigate()
 
   const fetchTasks = async () => {
     try {
@@ -194,35 +238,116 @@ export const Dashboard = () => {
     }
   }
 
+  const fetchUsage = async () => {
+    try {
+      const data = await usageService.getUsage()
+      setUsage(data)
+    } catch (err) {
+      console.error("Failed to fetch usage")
+    }
+  }
+
+  useEffect(() => {
+    fetchTasks()
+    fetchUsage()
+  }, [])
+
   const handleUpload = async () => {
     if (!file) return
+
+    // 1. Client-side validation for free users
+    const isPro = user?.is_pro || user?.subscription_plan !== "free"
+
+    if (!isPro) {
+       if (file.size > 100 * 1024 * 1024) {
+          setUpgradeReason("Free plan is limited to 100MB per file.")
+          setIsUpgradeModalOpen(true)
+          return
+       }
+       if (usage && usage.count_today >= 10) {
+          setUpgradeReason("You've reached your daily limit of 10 processing tasks.")
+          setIsUpgradeModalOpen(true)
+          return
+       }
+    }
+
     setIsProcessing(true)
     setProcessingStage('uploading')
 
-    // Simulate stages for smoother UX
     const stageTimer = (stage: any, delay: number) => new Promise(res => setTimeout(() => { setProcessingStage(stage); res(null); }, delay));
 
     try {
-      // Backend call is synchronous currently, so stages are simulated for UX polish
       const uploadPromise = taskService.uploadAndProcess(file, tool);
-
       await stageTimer('analyzing', 800);
       setProcessingStage('processing');
-
       const res = await uploadPromise;
 
-      setProcessingStage('finalizing');
-      await stageTimer('completed', 500);
+      if (res.status === 'failed') {
+         setProcessingStage('idle');
+         showToast(res.error_message || "Processing failed", "error");
+      } else {
+         setProcessingStage('finalizing');
+         await stageTimer('completed', 500);
+         setLastTask(res);
+         showToast("Success!", "success");
+      }
 
-      setLastTask(res);
       setFile(null);
       fetchTasks();
-      showToast("Success!", "success");
+      fetchUsage();
     } catch (err: any) {
       setProcessingStage('idle');
-      showToast(err.response?.data?.detail || "Processing failed", "error")
+      if (err.response?.status === 403) {
+         setUpgradeReason(err.response?.data?.detail)
+         setIsUpgradeModalOpen(true)
+      } else {
+         showToast(err.response?.data?.detail || "Processing failed", "error")
+      }
     } finally {
       setIsProcessing(false);
+    }
+  }
+
+  const handleUpgrade = async (plan: string) => {
+    setPaymentLoading(plan)
+    try {
+      const order = await paymentService.createOrder(plan)
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || "",
+        amount: order.amount,
+        currency: order.currency,
+        name: "EnhanceAI",
+        description: `${plan} Plan Upgrade`,
+        order_id: order.id,
+        handler: async (response: any) => {
+          try {
+            await paymentService.verifyPayment(
+              response.razorpay_order_id,
+              response.razorpay_payment_id,
+              response.razorpay_signature
+            )
+            showToast("Upgrade Successful!", "success")
+            window.location.reload()
+          } catch (err) {
+            showToast("Verification failed", "error")
+          }
+        },
+        prefill: {
+          name: user?.full_name,
+          email: user?.email,
+        },
+        theme: {
+          color: "#3b82f6",
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      showToast("Payment failed to initialize", "error")
+    } finally {
+      setPaymentLoading(null)
     }
   }
 
@@ -232,19 +357,27 @@ export const Dashboard = () => {
   return (
     <PageTransition>
       <div className="container mx-auto px-4 py-12">
+        <UpgradeModal
+          isOpen={isUpgradeModalOpen}
+          onClose={() => setIsUpgradeModalOpen(false)}
+          onUpgrade={handleUpgrade}
+          loading={paymentLoading}
+          reason={upgradeReason}
+        />
+
         <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <h1 className="text-4xl font-black tracking-tight text-white mb-2">Workstation</h1>
             <p className="text-gray-500 font-medium">Manage and process your media assets with full precision.</p>
           </div>
           <div className="flex gap-4">
-             <div className="bg-dark-lighter border border-dark-lightest p-4 px-8 rounded-2xl flex flex-col items-center">
-                <span className="text-[10px] uppercase font-black text-gray-500 tracking-widest mb-1">Tasks Run</span>
-                <span className="text-2xl font-black text-primary">{tasks.length}</span>
+             <div className="bg-dark-lighter border border-dark-lightest p-4 px-8 rounded-2xl flex flex-col items-center min-w-[140px]">
+                <span className="text-[10px] uppercase font-black text-gray-500 tracking-widest mb-1">Today's Usage</span>
+                <span className="text-2xl font-black text-primary">{usage?.count_today || 0} / {usage?.limit === 999999 ? '∞' : 10}</span>
              </div>
-             <div className="bg-dark-lighter border border-dark-lightest p-4 px-8 rounded-2xl flex flex-col items-center">
-                <span className="text-[10px] uppercase font-black text-gray-500 tracking-widest mb-1">Disk Usage</span>
-                <span className="text-2xl font-black text-white">4.2GB</span>
+             <div className="bg-dark-lighter border border-dark-lightest p-4 px-8 rounded-2xl flex flex-col items-center min-w-[140px]">
+                <span className="text-[10px] uppercase font-black text-gray-500 tracking-widest mb-1">Total Runs</span>
+                <span className="text-2xl font-black text-white">{usage?.total_count || 0}</span>
              </div>
           </div>
         </header>
@@ -299,14 +432,14 @@ export const Dashboard = () => {
 
                       <div className="grid grid-cols-2 gap-4 w-full max-w-md mb-10 text-center">
                         <div className="bg-dark p-4 rounded-xl border border-dark-lightest">
-                          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1 text-center">Efficiency</span>
+                          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Efficiency</span>
                           <span className="text-lg font-black text-green-400">
                              -{Math.abs(((lastTask.original_size - lastTask.enhanced_size) / lastTask.original_size) * 100).toFixed(1)}%
                           </span>
                           <p className="text-[10px] text-gray-500 mt-1">{formatBytes(lastTask.original_size)} → {formatBytes(lastTask.enhanced_size)}</p>
                         </div>
                         <div className="bg-dark p-4 rounded-xl border border-dark-lightest">
-                          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1 text-center">Speed</span>
+                          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Speed</span>
                           <span className="text-lg font-black text-white">{lastTask.processing_time?.toFixed(2)}s</span>
                           <p className="text-[10px] text-gray-500 mt-1 capitalize">{lastTask.tool}</p>
                         </div>
@@ -358,7 +491,7 @@ export const Dashboard = () => {
                                <button
                                   onClick={(e) => { e.preventDefault(); setFile(null); }}
                                   className="mt-6 text-sm font-bold text-gray-500 hover:text-red-400 flex items-center transition"
-                               >
+                                >
                                  <X size={14} className="mr-1" /> Remove File
                                </button>
                             </div>
@@ -472,10 +605,6 @@ export const History = () => {
   const [filter, setFilter] = useState("all")
   const { showToast } = useAuth()
 
-  useEffect(() => {
-    fetchTasks()
-  }, [])
-
   const fetchTasks = async () => {
     try {
       const data = await taskService.getTasks()
@@ -486,6 +615,10 @@ export const History = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchTasks()
+  }, [])
 
   const handleDelete = async (id: number) => {
     try {
@@ -499,7 +632,8 @@ export const History = () => {
 
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
-      const matchesSearch = t.filename.toLowerCase().includes(searchTerm.toLowerCase())
+      const filename = t.filename || ""
+      const matchesSearch = filename.toLowerCase().includes(searchTerm.toLowerCase())
       if (filter === 'all') return matchesSearch
       if (filter === 'completed') return matchesSearch && t.status === 'completed'
       if (filter === 'video') return matchesSearch && t.file_type === 'video'
@@ -604,7 +738,9 @@ export const History = () => {
                       <td className="px-6 py-5 hidden lg:table-cell">
                         {task.status === 'completed' ? (
                           <div className="text-[10px] font-black space-y-1">
-                             <div className="text-gray-300">{formatBytes(task.original_size)} <ArrowRight className="inline mx-1 opacity-50" size={10} /> {formatBytes(task.enhanced_size)}</div>
+                             <div className="text-gray-300">
+                                {task.original_resolution && task.enhanced_resolution ? `${task.original_resolution} → ${task.enhanced_resolution}` : task.output_format}
+                             </div>
                              <div className="text-primary">{task.processing_time?.toFixed(2)}s runtime</div>
                           </div>
                         ) : <span className="text-gray-600">—</span>}
@@ -805,33 +941,65 @@ export const Settings = () => {
     <PageTransition>
       <div className="container mx-auto px-4 py-12">
         <h1 className="text-4xl font-black text-white tracking-tighter mb-12">Settings</h1>
-        <div className="max-w-2xl">
-          <Card title="Account Profile" subtitle="Personal information and subscription status">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          <Card title="Account Profile" subtitle="Personal information and access">
             <div className="space-y-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                   <div>
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Email Identity</label>
-                    <p className="text-white font-bold text-lg mt-1">{user?.email}</p>
+                    <p className="text-white font-bold text-lg mt-1 truncate">{user?.email}</p>
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Display Name</label>
                     <p className="text-white font-bold text-lg mt-1">{user?.full_name}</p>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Membership</label>
-                    <div className="mt-1">
-                       <Badge variant={user?.is_pro ? 'success' : 'neutral'} className="text-xs py-1 px-3">
-                         {user?.is_pro ? 'PRO MEMBER' : 'FREE ACCOUNT'}
-                       </Badge>
-                    </div>
-                  </div>
                 </div>
                 <hr className="border-dark-lightest" />
                 <div className="flex justify-between items-center">
-                   <p className="text-sm text-gray-500 font-medium">Danger Zone</p>
+                   <p className="text-sm text-gray-500 font-medium">Exit Workspace</p>
                    <Button variant="danger" size="sm" onClick={logout}>Sign Out</Button>
                 </div>
             </div>
+          </Card>
+
+          <Card title="Billing & Subscription" subtitle="Manage your plan and payment methods">
+             <div className="space-y-8">
+                <div>
+                   <div className="flex justify-between items-center mb-6">
+                      <div className="flex items-center space-x-3">
+                         <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                            <CreditCard size={24} />
+                         </div>
+                         <div>
+                            <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Active Plan</p>
+                            <p className="text-xl font-black text-white capitalize">{user?.subscription_plan}</p>
+                         </div>
+                      </div>
+                      <Badge variant={user?.is_pro ? 'success' : 'neutral'} className="text-xs py-1 px-3">
+                         {user?.subscription_status === 'past_due' ? 'ACTION REQUIRED' : 'STATUS: ACTIVE'}
+                      </Badge>
+                   </div>
+
+                   {user?.subscription_plan === 'free' ? (
+                      <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6">
+                         <p className="text-sm font-bold text-gray-300 mb-4">Unlock unlimited potential with Pro or Lifetime access.</p>
+                         <Button className="w-full" onClick={() => window.location.href='/pricing'}>View Upgrade Options</Button>
+                      </div>
+                   ) : (
+                      <div className="space-y-6">
+                         <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Renewal Date</span>
+                            <span className="text-white font-bold">{user?.subscription_end ? new Date(user.subscription_end).toLocaleDateString() : 'N/A'}</span>
+                         </div>
+                         <div className="bg-dark p-4 rounded-xl border border-dark-lightest">
+                            <p className="text-xs text-gray-500 leading-relaxed">
+                               Your {user?.subscription_plan} plan is active. To manage your billing or cancel, please contact support@enhanceai.com.
+                            </p>
+                         </div>
+                      </div>
+                   )}
+                </div>
+             </div>
           </Card>
         </div>
       </div>

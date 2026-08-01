@@ -92,10 +92,27 @@ export const taskService = {
 };
 
 export const paymentService = {
-  createCheckoutSession: async () => {
-    const response = await api.post("/payments/create-checkout-session");
+  createOrder: async (plan: string = "pro") => {
+    const formData = new FormData();
+    formData.append("plan", plan);
+    const response = await api.post("/payments/create-order", formData);
     return response.data;
   },
+  verifyPayment: async (order_id: string, payment_id: string, signature: string) => {
+    const formData = new FormData();
+    formData.append("order_id", order_id);
+    formData.append("payment_id", payment_id);
+    formData.append("signature", signature);
+    const response = await api.post("/payments/verify-payment", formData);
+    return response.data;
+  }
 };
+
+export const usageService = {
+  getUsage: async () => {
+    const response = await api.get("/usage");
+    return response.data;
+  }
+}
 
 export default api;

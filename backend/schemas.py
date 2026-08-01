@@ -22,7 +22,11 @@ class User(UserBase):
     id: int
     is_active: bool
     is_pro: bool
-    email_verified: bool
+    subscription_plan: Optional[str] = "free"
+    subscription_status: Optional[str] = "active"
+    subscription_end: Optional[datetime] = None
+    cancel_at_period_end: Optional[bool] = False
+    email_verified: Optional[bool] = False
     created_at: datetime
 
     class Config:
@@ -41,7 +45,7 @@ class Task(TaskBase):
     id: int
     owner_id: int
     status: str
-    progress: int
+    progress: Optional[int] = 0
     original_path: str
     enhanced_path: Optional[str] = None
     original_size: Optional[float] = None

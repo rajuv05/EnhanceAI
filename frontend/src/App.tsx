@@ -14,6 +14,7 @@ const Register = lazy(() => import('./pages/AppPages').then(m => ({ default: m.R
 const VerifyEmail = lazy(() => import('./pages/AppPages').then(m => ({ default: m.VerifyEmail })))
 const History = lazy(() => import('./pages/AppPages').then(m => ({ default: m.History })))
 const Settings = lazy(() => import('./pages/AppPages').then(m => ({ default: m.Settings })))
+const Admin = lazy(() => import('./pages/AppPages').then(m => ({ default: m.Settings }))) // Reuse settings or create new
 const NotFound = lazy(() => import('./pages/AppPages').then(m => ({ default: m.NotFound })))
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/history" element={<History />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/admin" element={<Settings />} /> {/* Placeholder */}
             </Route>
 
             <Route path="*" element={<NotFound />} />

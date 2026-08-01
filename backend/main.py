@@ -12,8 +12,11 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 
 import models, schemas, auth, utils, email_util
+import razorpay
 from database import engine, get_db
 from config import settings
+
+rzp_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 from image import image_processor
 from video import video_processor
 
@@ -144,6 +147,36 @@ def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
     return current_user
 
 # Media Processing Endpoints
+def get_user_usage(db: Session, user_id: int):
+    usage = db.query(models.UserUsage).filter(models.UserUsage.user_id == user_id).first()
+    if not usage:
+        usage = models.UserUsage(user_id=user_id)
+        db.add(usage)
+        db.commit()
+        db.refresh(usage)
+    
+    # Check if needs reset (new day)
+    now = datetime.datetime.now(datetime.UTC)
+    if usage.last_reset.date() < now.date():
+        usage.count_today = 0
+        usage.last_reset = now
+        db.commit()
+    
+    return usage
+
+@app.get("/api/v1/usage")
+def read_usage(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    usage = get_user_usage(db, current_user.id)
+    return {
+        "count_today": usage.count_today,
+        "total_count": usage.total_count,
+        "plan": current_user.subscription_plan,
+        "limit": 10 if current_user.subscription_plan == "free" else 999999
+    }
+
 @app.post("/api/v1/enhance", response_model=schemas.Task)
 async def create_processing_task(
     file: UploadFile = File(...),
@@ -151,18 +184,41 @@ async def create_processing_task(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    file_type = utils.get_file_type(file.filename)
-    if file_type == "unknown":
-        raise HTTPException(status_code=400, detail="Unsupported file type")
+    # 1. Validation Logic
+    plan = current_user.subscription_plan
+    is_pro = current_user.is_pro or plan in ["pro", "lifetime"]
     
+    # Check if user is actually active/pro via status
+    if plan == "pro" and current_user.subscription_status != "active":
+        is_pro = False
+
+    # Check file size (Free: 100MB, Pro: 2GB)
+    file_size_limit = 100 * 1024 * 1024 if not is_pro else 2 * 1024 * 1024 * 1024
+    
+    # We need to save first to check size or use file.size if available in Starlette
     file_path = utils.save_upload_file(file)
     original_size = os.path.getsize(file_path)
     
-    # Get original resolution
+    if original_size > file_size_limit:
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail=f"File too large for your plan ({'100MB' if not is_pro else '2GB'} limit)")
+
+    # Check daily usage for free users
+    if not is_pro:
+        usage = get_user_usage(db, current_user.id)
+        if usage.count_today >= 10:
+            os.remove(file_path)
+            raise HTTPException(status_code=403, detail="Daily limit reached. Please upgrade to Pro for unlimited access.")
+
+    # 2. Setup
+    file_type = utils.get_file_type(file.filename)
+    if file_type == "unknown":
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+    
     media_info = utils.get_media_info(file_path)
     original_res = media_info["resolution"] if media_info else None
     
-    # Create DB record
     db_task = models.EnhancementTask(
         owner_id=current_user.id,
         filename=file.filename,
@@ -174,12 +230,10 @@ async def create_processing_task(
         status=models.TaskStatus.PROCESSING
     )
     db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
     
+    # 3. Processing
     start_time = time.time()
     try:
-        # Determine enhanced filename with correct extension
         base, ext = os.path.splitext(file.filename)
         if tool == "gif": ext = ".gif"
         elif tool == "extract_audio": ext = ".mp3"
@@ -188,20 +242,49 @@ async def create_processing_task(
         enhanced_filename = f"proc_{uuid.uuid4()}{ext}"
         enhanced_path = os.path.join("uploads/enhanced", enhanced_filename)
         
+        # 3. Actual Processing
         if file_type == "image":
             image_processor.process(file_path, enhanced_path, tool)
         else:
             video_processor.process(file_path, enhanced_path, tool)
+
+        # 4. Apply Watermark for free users
+        if not is_pro and tool not in ["extract_audio", "remove_audio", "thumbnail", "watermark"]:
+            temp_path = enhanced_path + ".pre-wm" + ext
+            try:
+                os.rename(enhanced_path, temp_path)
+                if file_type == "image":
+                    image_processor.watermark(temp_path, enhanced_path)
+                else:
+                    video_processor.watermark(temp_path, enhanced_path)
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception as wm_err:
+                logger.error(f"Watermark failed, reverting to unwatermarked: {wm_err}")
+                if os.path.exists(temp_path):
+                    if os.path.exists(enhanced_path): os.remove(enhanced_path)
+                    os.rename(temp_path, enhanced_path)
             
-        # Get enhanced info
         enhanced_info = utils.get_media_info(enhanced_path)
         
         db_task.status = models.TaskStatus.COMPLETED
         db_task.enhanced_path = enhanced_path
-        db_task.enhanced_size = os.path.getsize(enhanced_path)
+        
+        if os.path.exists(enhanced_path):
+            db_task.enhanced_size = os.path.getsize(enhanced_path)
+        else:
+            db_task.enhanced_size = 0
+
         db_task.enhanced_resolution = enhanced_info["resolution"] if enhanced_info else None
         db_task.output_format = enhanced_info["format"] if enhanced_info else None
         db_task.progress = 100
+        
+        # Update usage
+        if not is_pro:
+            usage = get_user_usage(db, current_user.id)
+            usage.count_today += 1
+            usage.total_count += 1
+
     except Exception as e:
         logger.error(f"Processing failed: {str(e)}")
         db_task.status = models.TaskStatus.FAILED
@@ -262,43 +345,122 @@ def get_task(
     return task
 
 # Payments
-import stripe
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-@app.post("/api/v1/payments/create-checkout-session")
-async def create_checkout_session(current_user: models.User = Depends(auth.get_current_user)):
+@app.post("/api/v1/payments/create-order")
+async def create_order(
+    plan: str = Form("pro"),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     try:
-        checkout_session = stripe.checkout.Session.create(
-            customer_email=current_user.email,
-            payment_method_types=['card'],
-            line_items=[{'price': settings.STRIPE_PRO_PRICE_ID, 'quantity': 1}],
-            mode='subscription',
-            success_url=f"{settings.FRONTEND_URL}/dashboard?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.FRONTEND_URL}/pricing",
-            metadata={"user_id": current_user.id}
-        )
-        return {"url": checkout_session.url}
+        amount = settings.PRICE_PRO_MONTHLY if plan == "pro" else settings.PRICE_LIFETIME
+        
+        # If user is already on this plan, don't allow duplicate purchase
+        if current_user.subscription_plan == plan and current_user.subscription_status == "active":
+             raise HTTPException(status_code=400, detail=f"You already have an active {plan} subscription")
+
+        data = {
+            "amount": amount,
+            "currency": "INR",
+            "receipt": f"receipt_{current_user.id}_{int(time.time())}",
+            "notes": {
+                "user_id": current_user.id,
+                "plan": plan
+            }
+        }
+        order = rzp_client.order.create(data=data)
+        return order
     except Exception as e:
+        if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/v1/payments/webhook")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
-    payload = await request.body()
-    sig_header = request.headers.get('stripe-signature')
+@app.post("/api/v1/payments/verify-payment")
+async def verify_payment(
+    order_id: str = Form(...),
+    payment_id: str = Form(...),
+    signature: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid webhook")
+        # Verify signature
+        params_dict = {
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature
+        }
+        rzp_client.utility.verify_payment_signature(params_dict)
+        
+        # Get order details to know the plan
+        order = rzp_client.order.fetch(order_id)
+        plan = order['notes'].get('plan', 'pro')
+        
+        # Update user
+        current_user.subscription_plan = plan
+        current_user.is_pro = True
+        current_user.subscription_status = "active"
+        
+        if plan == "pro":
+            # Set expiry to 30 days from now for pro
+            current_user.subscription_end = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
+        else:
+            # Lifetime has no expiry
+            current_user.subscription_end = None
+            
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Payment verification failed")
 
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        user_id = session['metadata'].get('user_id')
+@app.post("/api/v1/payments/webhook")
+async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
+    # Razorpay Webhook implementation
+    payload = await request.body()
+    signature = request.headers.get('X-Razorpay-Signature')
+    
+    try:
+        rzp_client.utility.verify_webhook_signature(payload.decode(), signature, settings.RAZORPAY_WEBHOOK_SECRET)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    import json
+    event = json.loads(payload)
+    
+    if event['event'] == 'order.paid':
+        data = event['payload']['order']['entity']
+        user_id = data['notes'].get('user_id')
+        plan = data['notes'].get('plan')
         if user_id:
             user = db.query(models.User).filter(models.User.id == int(user_id)).first()
             if user:
+                user.subscription_plan = plan
                 user.is_pro = True
+                user.subscription_status = "active"
+                if plan == "pro":
+                    user.subscription_end = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
                 db.commit()
+
     return {"status": "success"}
+
+@app.get("/api/v1/admin/stats")
+def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+    # Basic security check
+    if current_user.email != os.getenv("ADMIN_EMAIL", "admin@enhanceai.com"):
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    total_users = db.query(models.User).count()
+    free_users = db.query(models.User).filter(models.User.subscription_plan == "free").count()
+    pro_users = db.query(models.User).filter(models.User.subscription_plan == "pro").count()
+    lifetime_users = db.query(models.User).filter(models.User.subscription_plan == "lifetime").count()
+    total_tasks = db.query(models.EnhancementTask).count()
+    
+    return {
+        "total_users": total_users,
+        "free": free_users,
+        "pro": pro_users,
+        "lifetime": lifetime_users,
+        "total_tasks": total_tasks,
+        "mrr": pro_users * 29,
+        "revenue": (pro_users * 29) + (lifetime_users * 499)
+    }
 
 if __name__ == "__main__":
     import uvicorn

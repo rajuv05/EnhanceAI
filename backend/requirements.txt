@@ -11,5 +11,5 @@ pydantic-settings
 pillow
 opencv-python-headless
 ffmpeg-python
-stripe
+razorpay
 alembic

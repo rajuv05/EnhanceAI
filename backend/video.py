@@ -81,9 +81,24 @@ class VideoProcessor:
         return self._run_ffmpeg(cmd)
 
     def watermark(self, input_path: str, output_path: str, text: str = "EnhanceAI"):
+        # Try to find a font on common systems
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "arial.ttf"
+        ]
+        font_file = ""
+        for path in font_paths:
+            if os.path.exists(path):
+                # Escape colons for Windows paths in FFmpeg filters
+                safe_path = path.replace(":", "\\\\:")
+                font_file = f":fontfile='{safe_path}'"
+                break
+
         cmd = [
             "ffmpeg", "-y", "-i", input_path, 
-            "-vf", f"drawtext=text='{text}':x=10:y=H-th-10:fontcolor=white:fontsize=24:shadowcolor=black:shadowx=2:shadowy=2",
+            "-vf", f"drawtext=text='{text}':x=10:y=H-th-10:fontcolor=white:fontsize=24{font_file}:shadowcolor=black:shadowx=2:shadowy=2",
             "-c:a", "copy", output_path
         ]
         return self._run_ffmpeg(cmd)
