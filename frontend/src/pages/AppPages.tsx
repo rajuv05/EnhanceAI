@@ -31,6 +31,12 @@ const getMediaUrl = (path: string) => {
   return `http://localhost:8000/${path}`; // Legacy local path
 };
 
+const handleDownload = (url: string, filename: string) => {
+  if (!url) return;
+  // Use _blank to ensure the SPA doesn't navigate away
+  window.open(url, '_blank');
+};
+
 const VIDEO_TOOLS = ["compress", "resize", "upscale", "brightness", "contrast", "saturation", "sharpen", "trim", "crop", "rotate", "fps", "convert", "extract_audio", "remove_audio", "gif", "watermark", "thumbnail"]
 const IMAGE_TOOLS = ["resize", "sharpen", "brightness", "contrast", "saturation", "optimize", "convert", "crop", "rotate", "flip", "blur", "watermark"]
 
@@ -462,12 +468,12 @@ export const Dashboard = () => {
                       </div>
 
                       <div className="flex gap-4 w-full max-w-md">
-                        <a
-                          href={getMediaUrl(lastTask.enhanced_path)}
+                        <button
+                          onClick={() => handleDownload(getMediaUrl(lastTask.enhanced_path), lastTask.filename)}
                           className="flex-1 h-14 bg-primary text-white rounded-xl font-bold flex items-center justify-center space-x-2 shadow-lg shadow-primary/20 hover:scale-[1.02] transition"
                         >
                           <Download size={20} /> <span>Download Now</span>
-                        </a>
+                        </button>
                         <Button variant="secondary" className="flex-1" onClick={() => setProcessingStage('idle')}>
                           Start Another
                         </Button>
@@ -590,14 +596,12 @@ export const Dashboard = () => {
                       </div>
                       <div className="flex items-center">
                          {task.status === 'completed' && (
-                            <a
-                              href={getMediaUrl(task.enhanced_path)}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              onClick={() => handleDownload(getMediaUrl(task.enhanced_path), task.filename)}
                               className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 hover:text-primary hover:bg-primary/10 transition"
                             >
                                <Download size={18} />
-                            </a>
+                            </button>
                          )}
                          <Link to="/history" className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 hover:text-white transition">
                             <ChevronRight size={20} />
@@ -779,15 +783,13 @@ export const History = () => {
                       <td className="px-6 py-5">
                         <div className="flex justify-end items-center space-x-2">
                            {task.status === 'completed' && (
-                             <a
-                               href={getMediaUrl(task.enhanced_path)}
-                               target="_blank"
-                               rel="noreferrer"
+                             <button
+                               onClick={() => handleDownload(getMediaUrl(task.enhanced_path), task.filename)}
                                className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition shadow-sm"
                                title="Download"
                              >
                                 <Download size={18} />
-                             </a>
+                             </button>
                            )}
                            <button
                             onClick={() => handleDelete(task.id)}
