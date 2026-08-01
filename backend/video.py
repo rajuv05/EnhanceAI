@@ -25,7 +25,7 @@ class VideoProcessor:
 
     def compress(self, input_path: str, output_path: str):
         """High-efficiency H.264 compression with balanced quality."""
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vcodec", "libx264", "-crf", "28", "-preset", "medium", "-acodec", "aac", "-movflags", "+faststart", output_path]
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vcodec", "libx264", "-crf", "28", "-preset", "faster", "-acodec", "aac", "-movflags", "+faststart", output_path]
         return self._run_ffmpeg(cmd)
 
     def optimize(self, input_path: str, output_path: str):
@@ -35,22 +35,22 @@ class VideoProcessor:
 
     def sharpen(self, input_path: str, output_path: str):
         """Natural sharpening algorithm using unsharp filter."""
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "unsharp=5:5:0.8:5:5:0.0", "-vcodec", "libx264", "-crf", "23", "-acodec", "aac", "-movflags", "+faststart", output_path]
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "unsharp=5:5:0.8:5:5:0.0", "-vcodec", "libx264", "-crf", "23", "-preset", "faster", "-acodec", "copy", "-movflags", "+faststart", output_path]
         return self._run_ffmpeg(cmd)
 
     def brightness(self, input_path: str, output_path: str, level: float = 0.15):
         """Improve exposure using eq filter with balanced gamma."""
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=brightness={level}:gamma=1.1", "-vcodec", "libx264", "-crf", "23", "-acodec", "aac", "-movflags", "+faststart", output_path]
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"eq=brightness={level}:gamma=1.1", "-vcodec", "libx264", "-crf", "23", "-preset", "faster", "-acodec", "copy", "-movflags", "+faststart", output_path]
         return self._run_ffmpeg(cmd)
 
     def crop(self, input_path: str, output_path: str):
         """High-quality center square crop."""
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "crop='min(iw,ih)':'min(iw,ih)'", "-vcodec", "libx264", "-crf", "20", "-acodec", "aac", "-movflags", "+faststart", output_path]
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", "crop='min(iw,ih)':'min(iw,ih)'", "-vcodec", "libx264", "-crf", "20", "-preset", "faster", "-acodec", "copy", "-movflags", "+faststart", output_path]
         return self._run_ffmpeg(cmd)
 
     def resize(self, input_path: str, output_path: str, width: int = -2, height: int = 720):
         """Resize using high-quality Lanczos interpolation."""
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"scale={width}:{height}:flags=lanczos", "-vcodec", "libx264", "-crf", "23", "-acodec", "aac", "-movflags", "+faststart", output_path]
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"scale={width}:{height}:flags=lanczos", "-vcodec", "libx264", "-crf", "23", "-preset", "faster", "-acodec", "copy", "-movflags", "+faststart", output_path]
         return self._run_ffmpeg(cmd)
 
     def process(self, input_path: str, output_path: str, tool: str):

@@ -271,6 +271,9 @@ async def create_processing_task(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    total_start = time.time()
+    timings = {}
+
     # 1. Validation Logic
     plan = current_user.subscription_plan or "free"
     is_pro = (current_user.is_pro or False) or plan in ["pro", "lifetime"]
@@ -282,8 +285,11 @@ async def create_processing_task(
     # Check file size (Free: 100MB, Pro: 2GB)
     file_size_limit = 100 * 1024 * 1024 if not is_pro else 2 * 1024 * 1024 * 1024
     
-    # We need to save first to check size or use file.size if available in Starlette
+    # Save upload
+    t_start = time.time()
     file_path = utils.save_upload_file(file)
+    timings["Save upload"] = time.time() - t_start
+    
     original_size = os.path.getsize(file_path)
     
     if original_size > file_size_limit:
@@ -303,7 +309,10 @@ async def create_processing_task(
         os.remove(file_path)
         raise HTTPException(status_code=400, detail="Unsupported file type")
     
+    t_start = time.time()
     media_info = utils.get_media_info(file_path)
+    timings["ffprobe"] = time.time() - t_start
+    
     original_res = media_info["resolution"] if media_info else None
     
     db_task = models.EnhancementTask(
@@ -317,9 +326,9 @@ async def create_processing_task(
         status=models.TaskStatus.PROCESSING
     )
     db.add(db_task)
+    db.commit()
     
     # 3. Processing
-    start_time = time.time()
     try:
         base, ext = os.path.splitext(file.filename)
         
@@ -327,25 +336,33 @@ async def create_processing_task(
         enhanced_path = os.path.join("uploads/enhanced", enhanced_filename)
         
         # 3. Actual Processing
+        t_start = time.time()
         if file_type == "image":
             image_processor.process(file_path, enhanced_path, tool)
         else:
             video_processor.process(file_path, enhanced_path, tool)
+        timings["FFmpeg"] = time.time() - t_start
 
         enhanced_info = utils.get_media_info(enhanced_path)
 
         # Final validation and Cloudinary Upload
         if os.path.exists(enhanced_path) and os.path.getsize(enhanced_path) > 0:
             # Upload both to Cloudinary for production persistence
+            t_start = time.time()
             cloudinary_original_url = utils.upload_to_cloudinary(
                 file_path, 
                 resource_type="image" if file_type == "image" else "video"
             )
+            timings["Cloudinary original upload"] = time.time() - t_start
+            
+            t_start = time.time()
             cloudinary_enhanced_url = utils.upload_to_cloudinary(
                 enhanced_path, 
                 resource_type="image" if file_type == "image" else "video"
             )
+            timings["Cloudinary enhanced upload"] = time.time() - t_start
             
+            t_start = time.time()
             db_task.status = models.TaskStatus.COMPLETED
             db_task.original_path = cloudinary_original_url
             db_task.enhanced_path = cloudinary_enhanced_url # Store secure URL
@@ -360,12 +377,18 @@ async def create_processing_task(
                 usage.count_today += 1
                 usage.total_count += 1
             
+            db_task.processing_time = time.time() - total_start
+            db.commit()
+            timings["Database update"] = time.time() - t_start
+            
             # Clean up local temporary files
+            t_start = time.time()
             try:
                 if os.path.exists(file_path): os.remove(file_path)
                 if os.path.exists(enhanced_path): os.remove(enhanced_path)
             except Exception as cleanup_err:
                 logger.error(f"Temp file cleanup failed: {cleanup_err}")
+            timings["Cleanup"] = time.time() - t_start
         else:
             raise Exception("FFmpeg finished but output file is missing or empty")
 
@@ -373,6 +396,8 @@ async def create_processing_task(
         logger.error(f"Processing failed: {str(e)}")
         db_task.status = models.TaskStatus.FAILED
         db_task.error_message = str(e)
+        db_task.processing_time = time.time() - total_start
+        db.commit()
         
         # Cleanup on failure
         try:
@@ -380,9 +405,13 @@ async def create_processing_task(
             if 'enhanced_path' in locals() and os.path.exists(enhanced_path): os.remove(enhanced_path)
         except: pass
     
-    db_task.processing_time = time.time() - start_time
-    db.commit()
-    db.refresh(db_task)
+    # Print Performance Logs
+    print("\n" + "="*30)
+    print(f"PERFORMANCE PROFILE: {tool.upper()}")
+    for stage, duration in timings.items():
+        print(f"{stage}: {duration:.2f}s")
+    print(f"Total request: {time.time() - total_start:.2f}s")
+    print("="*30 + "\n")
     
     return db_task
 
