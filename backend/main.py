@@ -1,19 +1,28 @@
-import logging
-import time
-import os
-import uuid
 import datetime
+import logging
+import os
+import time
+import uuid
+from datetime import timedelta
 from typing import List
+
+import razorpay
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from datetime import timedelta
 
-import models, schemas, auth, utils, email_util
-import razorpay
+import auth
+import email_util
+import models
+import schemas
+import utils
 from database import engine, get_db
+
+print("Creating database tables...")
+models.Base.metadata.create_all(bind=engine)
+print("Database tables created.")
 from config import settings
 
 rzp_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
