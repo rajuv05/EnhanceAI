@@ -356,10 +356,21 @@ async def create_processing_task(
             
         enhanced_info = utils.get_media_info(enhanced_path)
 
-        # Final validation
+        # Final validation and Cloudinary Upload
         if os.path.exists(enhanced_path) and os.path.getsize(enhanced_path) > 0:
+            # Upload both to Cloudinary for production persistence
+            cloudinary_original_url = utils.upload_to_cloudinary(
+                file_path, 
+                resource_type="image" if file_type == "image" else "video"
+            )
+            cloudinary_enhanced_url = utils.upload_to_cloudinary(
+                enhanced_path, 
+                resource_type="image" if file_type == "image" else "video"
+            )
+            
             db_task.status = models.TaskStatus.COMPLETED
-            db_task.enhanced_path = enhanced_path
+            db_task.original_path = cloudinary_original_url
+            db_task.enhanced_path = cloudinary_enhanced_url # Store secure URL
             db_task.enhanced_size = os.path.getsize(enhanced_path)
             db_task.enhanced_resolution = enhanced_info["resolution"] if enhanced_info else None
             db_task.output_format = enhanced_info["format"] if enhanced_info else None
@@ -370,6 +381,13 @@ async def create_processing_task(
                 usage = get_user_usage(db, current_user.id)
                 usage.count_today += 1
                 usage.total_count += 1
+            
+            # Clean up local temporary files
+            try:
+                if os.path.exists(file_path): os.remove(file_path)
+                if os.path.exists(enhanced_path): os.remove(enhanced_path)
+            except Exception as cleanup_err:
+                logger.error(f"Temp file cleanup failed: {cleanup_err}")
         else:
             raise Exception("FFmpeg finished but output file is missing or empty")
 
@@ -377,6 +395,12 @@ async def create_processing_task(
         logger.error(f"Processing failed: {str(e)}")
         db_task.status = models.TaskStatus.FAILED
         db_task.error_message = str(e)
+        
+        # Cleanup on failure
+        try:
+            if 'file_path' in locals() and os.path.exists(file_path): os.remove(file_path)
+            if 'enhanced_path' in locals() and os.path.exists(enhanced_path): os.remove(enhanced_path)
+        except: pass
     
     db_task.processing_time = time.time() - start_time
     db.commit()
@@ -398,14 +422,14 @@ def delete_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # Delete files from disk if they exist
+    # Delete local files from disk if they exist
     try:
-        if os.path.exists(task.original_path):
+        if task.original_path and not task.original_path.startswith('http') and os.path.exists(task.original_path):
             os.remove(task.original_path)
-        if task.enhanced_path and os.path.exists(task.enhanced_path):
+        if task.enhanced_path and not task.enhanced_path.startswith('http') and os.path.exists(task.enhanced_path):
             os.remove(task.enhanced_path)
     except Exception as e:
-        logger.error(f"Error deleting files: {e}")
+        logger.error(f"Error deleting local files: {e}")
         
     db.delete(task)
     db.commit()

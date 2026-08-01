@@ -45,4 +45,9 @@ class Settings(BaseSettings):
     PRICE_PRO_MONTHLY: int = 2900 # ₹29
     PRICE_LIFETIME: int = 49900 # ₹499
 
+    # Cloudinary
+    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "")
+    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "")
+
 settings = Settings()

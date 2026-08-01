@@ -8,11 +8,21 @@ class ImageProcessor:
     def _run_ffmpeg(self, cmd: list):
         try:
             logger.info(f"Running Image FFmpeg: {' '.join(cmd)}")
-            subprocess.run(cmd, capture_output=True, text=True, check=True)
-            return True
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            
+            # Verify output
+            output_path = cmd[-1]
+            if os.path.exists(output_path):
+                size = os.path.getsize(output_path)
+                logger.info(f"Image FFmpeg successful. Output: {output_path} ({size} bytes)")
+                return True
+            else:
+                logger.error(f"Image FFmpeg missing output file: {output_path}")
+                raise Exception("Image processing failed to produce file")
         except subprocess.CalledProcessError as e:
-            logger.error(f"Image FFmpeg error: {e.stderr}")
-            raise Exception(f"Processing failed: {e.stderr}")
+            logger.error(f"Image FFmpeg error. Code: {e.returncode}")
+            logger.error(f"stderr: {e.stderr}")
+            raise Exception(f"Image processing failed: {e.stderr}")
 
     def resize(self, input_path: str, output_path: str):
         # 2x upscale using Lanczos

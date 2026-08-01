@@ -6,8 +6,19 @@ import json
 import logging
 from pathlib import Path
 from fastapi import UploadFile
+import cloudinary
+import cloudinary.uploader
+from config import settings
 
 logger = logging.getLogger(__name__)
+
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET,
+    secure=True
+)
 
 UPLOAD_DIR = Path("uploads")
 ORIGINAL_DIR = UPLOAD_DIR / "original"
@@ -72,3 +83,16 @@ def get_media_info(file_path: str):
     except Exception as e:
         logger.error(f"Error getting media info: {e}")
         return None
+
+def upload_to_cloudinary(file_path: str, resource_type: str = "auto") -> str:
+    """Uploads a local file to Cloudinary and returns the secure URL."""
+    try:
+        response = cloudinary.uploader.upload(
+            file_path, 
+            resource_type=resource_type,
+            folder="enhancify"
+        )
+        return response.get("secure_url")
+    except Exception as e:
+        logger.error(f"Cloudinary upload failed: {e}")
+        raise Exception(f"Cloudinary upload failed: {str(e)}")

@@ -25,6 +25,12 @@ const formatBytes = (bytes: number, decimals = 2) => {
 
 const getToolName = (tool: string) => tool?.replace('_', ' ') || 'Process';
 
+const getMediaUrl = (path: string) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path; // Cloudinary URL
+  return `http://localhost:8000/${path}`; // Legacy local path
+};
+
 const VIDEO_TOOLS = ["compress", "resize", "upscale", "brightness", "contrast", "saturation", "sharpen", "trim", "crop", "rotate", "fps", "convert", "extract_audio", "remove_audio", "gif", "watermark", "thumbnail"]
 const IMAGE_TOOLS = ["resize", "sharpen", "brightness", "contrast", "saturation", "optimize", "convert", "crop", "rotate", "flip", "blur", "watermark"]
 
@@ -457,7 +463,7 @@ export const Dashboard = () => {
 
                       <div className="flex gap-4 w-full max-w-md">
                         <a
-                          href={`http://localhost:8000/${lastTask.enhanced_path}`}
+                          href={getMediaUrl(lastTask.enhanced_path)}
                           className="flex-1 h-14 bg-primary text-white rounded-xl font-bold flex items-center justify-center space-x-2 shadow-lg shadow-primary/20 hover:scale-[1.02] transition"
                         >
                           <Download size={20} /> <span>Download Now</span>
@@ -585,7 +591,7 @@ export const Dashboard = () => {
                       <div className="flex items-center">
                          {task.status === 'completed' && (
                             <a
-                              href={`http://localhost:8000/${task.enhanced_path}`}
+                              href={getMediaUrl(task.enhanced_path)}
                               target="_blank"
                               rel="noreferrer"
                               className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 hover:text-primary hover:bg-primary/10 transition"
@@ -774,7 +780,7 @@ export const History = () => {
                         <div className="flex justify-end items-center space-x-2">
                            {task.status === 'completed' && (
                              <a
-                               href={`http://localhost:8000/${task.enhanced_path}`}
+                               href={getMediaUrl(task.enhanced_path)}
                                target="_blank"
                                rel="noreferrer"
                                className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition shadow-sm"
