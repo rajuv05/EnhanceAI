@@ -1,0 +1,14 @@
+fastapi[all]
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+python-multipart
+python-jose[cryptography]
+bcrypt==4.0.1
+passlib[bcrypt]==1.7.4
+pydantic-settings
+pillow
+opencv-python-headless
+ffmpeg-python
+stripe
