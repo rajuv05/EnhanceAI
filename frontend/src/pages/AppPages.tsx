@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button, Card, Loader, Input, Badge, Skeleton } from '../components/UI'
 import { UpgradeModal } from '../components/SubscriptionModals'
+import { AdBanner } from '../components/AdBanner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { taskService, paymentService, authService, usageService } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -72,6 +73,8 @@ export const Home = () => {
             View Pricing
           </Button>
         </div>
+
+        <AdBanner position="home" className="mt-20 max-w-4xl" />
 
         <div className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 opacity-50 grayscale hover:opacity-100 transition-all duration-500">
            <div className="font-black text-2xl tracking-tighter">FFMPEG</div>
@@ -206,6 +209,10 @@ export const Pricing = () => {
               </Card>
             )
           })}
+        </div>
+
+        <div className="mt-20 max-w-4xl mx-auto">
+           <AdBanner position="pricing" />
         </div>
       </div>
     </PageTransition>
@@ -361,6 +368,7 @@ export const Dashboard = () => {
           isOpen={isUpgradeModalOpen}
           onClose={() => setIsUpgradeModalOpen(false)}
           onUpgrade={handleUpgrade}
+          onRewardSuccess={fetchUsage}
           loading={paymentLoading}
           reason={upgradeReason}
         />
@@ -381,6 +389,8 @@ export const Dashboard = () => {
              </div>
           </div>
         </header>
+
+        <AdBanner position="dashboard" className="mb-8" />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-7 space-y-8">
@@ -508,21 +518,29 @@ export const Dashboard = () => {
                       </div>
 
                       {file && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Choose Tool</label>
-                            <select
-                              className="w-full h-14 bg-dark border border-dark-lightest rounded-xl p-4 capitalize text-white font-bold outline-none focus:border-primary transition appearance-none"
-                              value={tool}
-                              onChange={(e) => setTool(e.target.value)}
-                            >
-                              {currentTools.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex flex-col justify-end">
-                             <Button onClick={handleUpload} size="lg" className="w-full">
-                               Begin Transformation
-                             </Button>
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                          {user?.subscription_plan === 'free' && (
+                            <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 flex items-center space-x-2">
+                              <AlertCircle size={16} className="text-orange-400" />
+                              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Free Plan: Watermark will be applied</span>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Choose Tool</label>
+                              <select
+                                className="w-full h-14 bg-dark border border-dark-lightest rounded-xl p-4 capitalize text-white font-bold outline-none focus:border-primary transition appearance-none"
+                                value={tool}
+                                onChange={(e) => setTool(e.target.value)}
+                              >
+                                {currentTools.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+                              </select>
+                            </div>
+                            <div className="flex flex-col justify-end">
+                               <Button onClick={handleUpload} size="lg" className="w-full">
+                                 Begin Transformation
+                               </Button>
+                            </div>
                           </div>
                         </motion.div>
                       )}
@@ -672,6 +690,8 @@ export const History = () => {
             </select>
           </div>
         </div>
+
+        <AdBanner position="history" className="mb-8" />
 
         <Card noPadding>
           <div className="overflow-x-auto">
@@ -935,32 +955,67 @@ export const Register = () => {
 // --- Error Pages & Settings ---
 
 export const Settings = () => {
-  const { user, logout } = useAuth()
+  const { user, logout, showToast } = useAuth()
+  const [usage, setUsage] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    usageService.getUsage().then(setUsage).finally(() => setLoading(false))
+  }, [])
 
   return (
     <PageTransition>
       <div className="container mx-auto px-4 py-12">
         <h1 className="text-4xl font-black text-white tracking-tighter mb-12">Settings</h1>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          <Card title="Account Profile" subtitle="Personal information and access">
-            <div className="space-y-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Email Identity</label>
-                    <p className="text-white font-bold text-lg mt-1 truncate">{user?.email}</p>
+          <div className="space-y-8">
+            <Card title="Account Profile" subtitle="Personal information and access">
+              <div className="space-y-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Email Identity</label>
+                      <p className="text-white font-bold text-lg mt-1 truncate">{user?.email}</p>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Display Name</label>
+                      <p className="text-white font-bold text-lg mt-1">{user?.full_name}</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Display Name</label>
-                    <p className="text-white font-bold text-lg mt-1">{user?.full_name}</p>
+                  <hr className="border-dark-lightest" />
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-500 font-medium">Exit Workspace</p>
+                    <Button variant="danger" size="sm" onClick={logout}>Sign Out</Button>
                   </div>
-                </div>
-                <hr className="border-dark-lightest" />
-                <div className="flex justify-between items-center">
-                   <p className="text-sm text-gray-500 font-medium">Exit Workspace</p>
-                   <Button variant="danger" size="sm" onClick={logout}>Sign Out</Button>
-                </div>
-            </div>
-          </Card>
+              </div>
+            </Card>
+
+            <Card title="Platform Usage" subtitle="Today's activity and limits">
+               {loading ? <Skeleton className="h-40 w-full" /> : (
+                 <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="bg-dark p-4 rounded-xl border border-dark-lightest">
+                          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Standard Credits</span>
+                          <span className="text-xl font-black text-white">{Math.min(usage?.count_today, 10)} / 10</span>
+                       </div>
+                       <div className="bg-dark p-4 rounded-xl border border-dark-lightest">
+                          <span className="text-[10px] font-black text-gray-500 uppercase block mb-1">Reward Credits</span>
+                          <span className="text-xl font-black text-primary">{usage?.reward_credits} used</span>
+                       </div>
+                    </div>
+
+                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
+                       <div>
+                          <p className="text-sm font-bold text-white">Daily Total</p>
+                          <p className="text-xs text-gray-500 font-medium">Max potential: 25 tasks/day</p>
+                       </div>
+                       <div className="text-right">
+                          <p className="text-xl font-black text-primary">{usage?.count_today} / {usage?.total_limit}</p>
+                       </div>
+                    </div>
+                 </div>
+               )}
+            </Card>
+          </div>
 
           <Card title="Billing & Subscription" subtitle="Manage your plan and payment methods">
              <div className="space-y-8">

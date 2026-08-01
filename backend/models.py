@@ -46,6 +46,8 @@ class UserUsage(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True)
     count_today = Column(Integer, default=0)
+    reward_credits = Column(Integer, default=0)
+    reward_ads_watched = Column(Integer, default=0)
     last_reset = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     total_count = Column(Integer, default=0)
     

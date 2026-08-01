@@ -148,34 +148,103 @@ def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
 
 # Media Processing Endpoints
 def get_user_usage(db: Session, user_id: int):
-    usage = db.query(models.UserUsage).filter(models.UserUsage.user_id == user_id).first()
-    if not usage:
-        usage = models.UserUsage(user_id=user_id)
-        db.add(usage)
-        db.commit()
-        db.refresh(usage)
-    
-    # Check if needs reset (new day)
-    now = datetime.datetime.now(datetime.UTC)
-    if usage.last_reset.date() < now.date():
-        usage.count_today = 0
-        usage.last_reset = now
-        db.commit()
-    
-    return usage
+    try:
+        usage = db.query(models.UserUsage).filter(models.UserUsage.user_id == user_id).first()
+        now = datetime.datetime.now(datetime.UTC)
+        
+        if not usage:
+            usage = models.UserUsage(
+                user_id=user_id, 
+                count_today=0, 
+                reward_credits=0, 
+                reward_ads_watched=0, 
+                total_count=0,
+                last_reset=now
+            )
+            db.add(usage)
+            db.commit()
+            db.refresh(usage)
+        
+        # Ensure values are not None
+        if usage.count_today is None: usage.count_today = 0
+        if usage.reward_credits is None: usage.reward_credits = 0
+        if usage.reward_ads_watched is None: usage.reward_ads_watched = 0
+        if usage.total_count is None: usage.total_count = 0
+        
+        # Check if needs reset (new day)
+        if usage.last_reset is None:
+            usage.last_reset = now
+            db.commit()
+        
+        # Extract dates safely for comparison
+        last_reset_date = usage.last_reset.date() if hasattr(usage.last_reset, 'date') else now.date()
+        if last_reset_date < now.date():
+            usage.count_today = 0
+            usage.reward_credits = 0
+            usage.reward_ads_watched = 0
+            usage.last_reset = now
+            db.commit()
+        
+        return usage
+    except Exception as e:
+        logger.error(f"Error in get_user_usage: {e}")
+        # Return a temporary object if DB fails to avoid crashing entire app
+        return models.UserUsage(count_today=0, reward_credits=0, total_count=0)
 
 @app.get("/api/v1/usage")
 def read_usage(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    try:
+        usage = get_user_usage(db, current_user.id)
+        plan = current_user.subscription_plan or "free"
+        base_limit = 10 if plan == "free" else 999999
+        
+        # Calculate totals safely
+        reward_credits = usage.reward_credits or 0
+        count_today = usage.count_today or 0
+        
+        return {
+            "count_today": count_today,
+            "reward_credits": reward_credits,
+            "reward_ads_watched": usage.reward_ads_watched or 0,
+            "total_count": usage.total_count or 0,
+            "plan": plan,
+            "base_limit": base_limit,
+            "total_limit": base_limit + reward_credits,
+            "remaining": max(0, (base_limit + reward_credits) - count_today)
+        }
+    except Exception as e:
+        logger.error(f"Usage error: {e}")
+        return {
+            "count_today": 0,
+            "reward_credits": 0,
+            "reward_ads_watched": 0,
+            "total_count": 0,
+            "plan": "free",
+            "base_limit": 10,
+            "total_limit": 10,
+            "remaining": 10
+        }
+
+@app.post("/api/v1/usage/reward")
+def claim_reward(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if current_user.subscription_plan != "free":
+        raise HTTPException(status_code=400, detail="Rewards only available for free users")
+        
     usage = get_user_usage(db, current_user.id)
-    return {
-        "count_today": usage.count_today,
-        "total_count": usage.total_count,
-        "plan": current_user.subscription_plan,
-        "limit": 10 if current_user.subscription_plan == "free" else 999999
-    }
+    if usage.reward_ads_watched >= 3:
+        raise HTTPException(status_code=400, detail="Daily maximum of 3 rewards reached")
+        
+    usage.reward_ads_watched += 1
+    usage.reward_credits += 5
+    db.commit()
+    
+    return {"msg": "Reward claimed", "reward_credits": usage.reward_credits}
 
 @app.post("/api/v1/enhance", response_model=schemas.Task)
 async def create_processing_task(
@@ -185,8 +254,8 @@ async def create_processing_task(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     # 1. Validation Logic
-    plan = current_user.subscription_plan
-    is_pro = current_user.is_pro or plan in ["pro", "lifetime"]
+    plan = current_user.subscription_plan or "free"
+    is_pro = (current_user.is_pro or False) or plan in ["pro", "lifetime"]
     
     # Check if user is actually active/pro via status
     if plan == "pro" and current_user.subscription_status != "active":
@@ -206,9 +275,9 @@ async def create_processing_task(
     # Check daily usage for free users
     if not is_pro:
         usage = get_user_usage(db, current_user.id)
-        if usage.count_today >= 10:
+        if usage.count_today >= (10 + usage.reward_credits):
             os.remove(file_path)
-            raise HTTPException(status_code=403, detail="Daily limit reached. Please upgrade to Pro for unlimited access.")
+            raise HTTPException(status_code=403, detail="Daily limit reached. Please upgrade to Pro or watch an ad for +5 credits.")
 
     # 2. Setup
     file_type = utils.get_file_type(file.filename)
@@ -250,40 +319,41 @@ async def create_processing_task(
 
         # 4. Apply Watermark for free users
         if not is_pro and tool not in ["extract_audio", "remove_audio", "thumbnail", "watermark"]:
-            temp_path = enhanced_path + ".pre-wm" + ext
-            try:
-                os.rename(enhanced_path, temp_path)
-                if file_type == "image":
-                    image_processor.watermark(temp_path, enhanced_path)
-                else:
-                    video_processor.watermark(temp_path, enhanced_path)
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-            except Exception as wm_err:
-                logger.error(f"Watermark failed, reverting to unwatermarked: {wm_err}")
-                if os.path.exists(temp_path):
-                    if os.path.exists(enhanced_path): os.remove(enhanced_path)
-                    os.rename(temp_path, enhanced_path)
+            if os.path.exists(enhanced_path):
+                temp_path = enhanced_path + ".pre-wm" + ext
+                try:
+                    os.rename(enhanced_path, temp_path)
+                    if file_type == "image":
+                        image_processor.watermark(temp_path, enhanced_path)
+                    else:
+                        video_processor.watermark(temp_path, enhanced_path)
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except Exception as wm_err:
+                    logger.error(f"Watermark failed, reverting to unwatermarked: {wm_err}")
+                    if os.path.exists(temp_path) and not os.path.exists(enhanced_path):
+                        os.rename(temp_path, enhanced_path)
+            else:
+                logger.error("Enhanced path does not exist, skipping watermark")
             
         enhanced_info = utils.get_media_info(enhanced_path)
-        
-        db_task.status = models.TaskStatus.COMPLETED
-        db_task.enhanced_path = enhanced_path
-        
-        if os.path.exists(enhanced_path):
-            db_task.enhanced_size = os.path.getsize(enhanced_path)
-        else:
-            db_task.enhanced_size = 0
 
-        db_task.enhanced_resolution = enhanced_info["resolution"] if enhanced_info else None
-        db_task.output_format = enhanced_info["format"] if enhanced_info else None
-        db_task.progress = 100
-        
-        # Update usage
-        if not is_pro:
-            usage = get_user_usage(db, current_user.id)
-            usage.count_today += 1
-            usage.total_count += 1
+        # Final validation
+        if os.path.exists(enhanced_path) and os.path.getsize(enhanced_path) > 0:
+            db_task.status = models.TaskStatus.COMPLETED
+            db_task.enhanced_path = enhanced_path
+            db_task.enhanced_size = os.path.getsize(enhanced_path)
+            db_task.enhanced_resolution = enhanced_info["resolution"] if enhanced_info else None
+            db_task.output_format = enhanced_info["format"] if enhanced_info else None
+            db_task.progress = 100
+            
+            # Update usage
+            if not is_pro:
+                usage = get_user_usage(db, current_user.id)
+                usage.count_today += 1
+                usage.total_count += 1
+        else:
+            raise Exception("FFmpeg finished but output file is missing or empty")
 
     except Exception as e:
         logger.error(f"Processing failed: {str(e)}")
@@ -345,11 +415,20 @@ def get_task(
     return task
 
 # Payments
+rzp_client = None
+if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET:
+    try:
+        rzp_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+    except Exception as e:
+        logger.error(f"Failed to initialize Razorpay: {e}")
+
 @app.post("/api/v1/payments/create-order")
 async def create_order(
     plan: str = Form("pro"),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    if not rzp_client:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
     try:
         amount = settings.PRICE_PRO_MONTHLY if plan == "pro" else settings.PRICE_LIFETIME
         

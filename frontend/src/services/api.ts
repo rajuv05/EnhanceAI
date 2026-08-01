@@ -112,6 +112,10 @@ export const usageService = {
   getUsage: async () => {
     const response = await api.get("/usage");
     return response.data;
+  },
+  claimReward: async () => {
+    const response = await api.post("/usage/reward");
+    return response.data;
   }
 }
 
