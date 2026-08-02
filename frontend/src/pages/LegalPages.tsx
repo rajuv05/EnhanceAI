@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Card, Button, Input, Badge } from '../components/UI'
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Card, Button, Input, Badge } from '../components/UI';
 import {
   ShieldCheck,
   Scale,
@@ -12,9 +12,9 @@ import {
   AlertTriangle,
   Send,
   ChevronRight,
-  Clock
-} from "lucide-react" from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+  Clock,
+} from "lucide-react";
+import { useAuth } from '../context/AuthContext';
 
 const PageTransition = ({ children }: { children: React.ReactNode }) => (
   <motion.div
