@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAuth } from '../context/AuthContext';
 
+
 const PageTransition = ({ children }: { children: React.ReactNode }) => (
   <motion.div
     initial={{ opacity: 0, y: 10 }}

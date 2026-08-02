@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, User, LogOut, LayoutDashboard, History, Settings, CreditCard, ChevronDown } from 'lucide-react'
+import { Menu, X, User, LogOut, LayoutDashboard, History, Settings, CreditCard, ChevronDown , Mail } from 'lucide-react'
 
 export const Navbar = () => {
   const { isAuthenticated, logout, user } = useAuth()
