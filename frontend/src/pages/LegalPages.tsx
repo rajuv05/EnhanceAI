@@ -65,7 +65,7 @@ export const About = () => {
     </div>
   </PageTransition>
 )
-}
+};
 
 export const PrivacyPolicy = () => {
   React.useEffect(() => { document.title = "Privacy Policy | EnhanceAI" }, [])
@@ -102,7 +102,7 @@ export const PrivacyPolicy = () => {
     </div>
   </PageTransition>
 )
-}
+};
 
 export const TermsOfService = () => {
   React.useEffect(() => { document.title = "Terms of Service | EnhanceAI" }, [])
@@ -133,7 +133,7 @@ export const TermsOfService = () => {
     </div>
   </PageTransition>
 )
-}
+};
 
 export const RefundPolicy = () => {
   React.useEffect(() => { document.title = "Refund Policy | EnhanceAI" }, [])
@@ -164,7 +164,7 @@ export const RefundPolicy = () => {
     </div>
   </PageTransition>
 )
-}
+};
 
 export const ContactUs = () => {
   React.useEffect(() => { document.title = "Contact Us | EnhanceAI" }, [])
@@ -233,7 +233,7 @@ export const ContactUs = () => {
       </div>
     </PageTransition>
   )
-}
+};
 
 export const FAQ = () => {
   React.useEffect(() => { document.title = "FAQ | EnhanceAI" }, [])
@@ -261,7 +261,7 @@ export const FAQ = () => {
     </div>
   </PageTransition>
 )
-}
+};
 
 export const CookiePolicy = () => {
   React.useEffect(() => { document.title = "Cookie Policy | EnhanceAI" }, [])
@@ -291,7 +291,7 @@ export const CookiePolicy = () => {
     </div>
   </PageTransition>
 )
-}
+};
 
 export const DMCA = () => {
   React.useEffect(() => { document.title = "DMCA Policy | EnhanceAI" }, [])
@@ -319,7 +319,7 @@ export const DMCA = () => {
     </div>
   </PageTransition>
 )
-}
+};
 
 export const AcceptableUse = () => {
   React.useEffect(() => { document.title = "Acceptable Use Policy | EnhanceAI" }, [])
