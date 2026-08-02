@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import { Navbar, Footer } from './components/Layout'
 import { AuthGuard } from './components/AuthGuard'
 import { Loader } from './components/UI'
+import ScrollToTop from './components/ScrollToTop'
 
 // Lazy load pages
 const Home = lazy(() => import('./pages/AppPages').then(m => ({ default: m.Home })))
@@ -31,6 +32,7 @@ const AcceptableUse = lazy(() => import('./pages/LegalPages').then(m => ({ defau
 function App() {
   return (
     <div className="flex flex-col min-h-screen">
+      <ScrollToTop />
       <Navbar />
       <main className="flex-grow">
         <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><Loader /></div>}>
