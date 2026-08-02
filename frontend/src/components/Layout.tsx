@@ -168,37 +168,59 @@ const Toast = () => {
 }
 
 export const Footer = () => {
+  const currentYear = new Date().getFullYear()
+
   return (
-    <footer className="bg-dark-lighter border-t border-dark-lightest py-12">
+    <footer className="bg-dark-lighter border-t border-dark-lightest pt-20 pb-10">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8 text-center md:text-left">
-          <div className="col-span-1 md:col-span-2">
-             <Link to="/" className="text-2xl font-bold text-primary mb-4 block">EnhanceAI</Link>
-             <p className="text-gray-400 max-w-sm mx-auto md:mx-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+          <div className="col-span-1 md:col-span-1 lg:col-span-1">
+             <Link to="/" className="text-2xl font-black text-primary mb-6 block tracking-tighter">EnhanceAI</Link>
+             <p className="text-gray-500 font-medium leading-relaxed mb-6">
                Professional-grade media tools for designers, developers, and creators.
-               Fast, secure, and powered by open-source excellence.
+               Fast, secure, and powered by high-performance cloud engines.
              </p>
           </div>
+
           <div>
-            <h4 className="font-bold text-white mb-4">Product</h4>
-            <ul className="space-y-2 text-gray-400">
-              <li><Link to="/features" className="hover:text-primary transition">Features</Link></li>
-              <li><Link to="/pricing" className="hover:text-primary transition">Pricing</Link></li>
+            <h4 className="font-bold text-white mb-6 uppercase tracking-widest text-xs">Product</h4>
+            <ul className="space-y-4 text-gray-500 font-bold text-sm">
+              <li><Link to="/features" className="hover:text-primary transition-colors">Features</Link></li>
+              <li><Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link></li>
+              <li><Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link></li>
+              <li><Link to="/about" className="hover:text-primary transition-colors">About Us</Link></li>
             </ul>
           </div>
+
           <div>
-            <h4 className="font-bold text-white mb-4">Company</h4>
-            <ul className="space-y-2 text-gray-400">
-              <li><a href="#" className="hover:text-primary transition">Terms</a></li>
-              <li><a href="#" className="hover:text-primary transition">Privacy</a></li>
+            <h4 className="font-bold text-white mb-6 uppercase tracking-widest text-xs">Support & Legal</h4>
+            <ul className="space-y-4 text-gray-500 font-bold text-sm">
+              <li><Link to="/contact" className="hover:text-primary transition-colors">Contact Support</Link></li>
+              <li><Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
+              <li><Link to="/refund" className="hover:text-primary transition-colors">Refund Policy</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white mb-6 uppercase tracking-widest text-xs">Resources</h4>
+            <ul className="space-y-4 text-gray-500 font-bold text-sm">
+              <li><Link to="/cookies" className="hover:text-primary transition-colors">Cookie Policy</Link></li>
+              <li><Link to="/dmca" className="hover:text-primary transition-colors">DMCA Policy</Link></li>
+              <li><Link to="/acceptable-use" className="hover:text-primary transition-colors">Acceptable Use</Link></li>
             </ul>
           </div>
         </div>
-        <div className="border-t border-dark-lightest pt-8 text-center text-gray-500 text-sm">
-          <p>&copy; {new Date().getFullYear()} EnhanceAI. All rights reserved.</p>
+
+        <div className="border-t border-dark-lightest pt-10 flex flex-col md:flex-row justify-between items-center gap-6">
+          <p className="text-gray-600 font-bold text-xs uppercase tracking-widest">
+            &copy; {currentYear} EnhanceAI. All rights reserved.
+          </p>
+          <div className="flex space-x-6">
+             <a href="#" className="text-gray-600 hover:text-white transition-colors"><Mail size={18} /></a>
+          </div>
         </div>
       </div>
-      <Toast />
     </footer>
   )
 }
