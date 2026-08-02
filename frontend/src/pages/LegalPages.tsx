@@ -2,9 +2,18 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, Button, Input, Badge } from '../components/UI'
 import {
-  ShieldCheck, Scale, RefreshCw, Mail, HelpCircle,
-  Cookie, Copyright, AlertTriangle, Send, ChevronRight
-} from 'lucide-react'
+  ShieldCheck,
+  Scale,
+  RefreshCw,
+  Mail,
+  HelpCircle,
+  Cookie,
+  Copyright,
+  AlertTriangle,
+  Send,
+  ChevronRight,
+  Clock
+} from "lucide-react" from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const PageTransition = ({ children }: { children: React.ReactNode }) => (
@@ -56,6 +65,7 @@ export const About = () => {
     </div>
   </PageTransition>
 )
+}
 
 export const PrivacyPolicy = () => {
   React.useEffect(() => { document.title = "Privacy Policy | EnhanceAI" }, [])
@@ -92,6 +102,7 @@ export const PrivacyPolicy = () => {
     </div>
   </PageTransition>
 )
+}
 
 export const TermsOfService = () => {
   React.useEffect(() => { document.title = "Terms of Service | EnhanceAI" }, [])
@@ -122,6 +133,7 @@ export const TermsOfService = () => {
     </div>
   </PageTransition>
 )
+}
 
 export const RefundPolicy = () => {
   React.useEffect(() => { document.title = "Refund Policy | EnhanceAI" }, [])
@@ -152,6 +164,7 @@ export const RefundPolicy = () => {
     </div>
   </PageTransition>
 )
+}
 
 export const ContactUs = () => {
   React.useEffect(() => { document.title = "Contact Us | EnhanceAI" }, [])
@@ -248,6 +261,7 @@ export const FAQ = () => {
     </div>
   </PageTransition>
 )
+}
 
 export const CookiePolicy = () => {
   React.useEffect(() => { document.title = "Cookie Policy | EnhanceAI" }, [])
@@ -277,6 +291,7 @@ export const CookiePolicy = () => {
     </div>
   </PageTransition>
 )
+}
 
 export const DMCA = () => {
   React.useEffect(() => { document.title = "DMCA Policy | EnhanceAI" }, [])
@@ -304,6 +319,7 @@ export const DMCA = () => {
     </div>
   </PageTransition>
 )
+}
 
 export const AcceptableUse = () => {
   React.useEffect(() => { document.title = "Acceptable Use Policy | EnhanceAI" }, [])
@@ -335,3 +351,4 @@ export const AcceptableUse = () => {
     </div>
   </PageTransition>
 )
+}
