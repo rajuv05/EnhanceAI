@@ -51,6 +51,38 @@ def get_file_type(filename: str) -> str:
         return "video"
     return "unknown"
 
+def _run_ffmpeg(self, cmd: list):
+    try:
+        full_cmd = ["ffmpeg", "-hide_banner", "-y", "-threads", "0"] + cmd[1:]
+
+        logger.info(f"Executing FFmpeg: {' '.join(full_cmd)}")
+
+        import time
+        start = time.perf_counter()
+
+        result = subprocess.run(
+            full_cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        elapsed = time.perf_counter() - start
+        logger.info(f"Pure FFmpeg execution: {elapsed:.2f}s")
+
+        output_path = full_cmd[-1]
+
+        if os.path.exists(output_path):
+            size = os.path.getsize(output_path)
+            logger.info(f"Output: {output_path} ({size} bytes)")
+            return True
+
+        raise Exception("FFmpeg failed")
+
+    except subprocess.CalledProcessError as e:
+        logger.error(e.stderr)
+        raise
+
 def get_media_info(file_path: str):
     """Get resolution and format info using ffprobe."""
     try:
@@ -63,6 +95,7 @@ def get_media_info(file_path: str):
             file_path
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
+
         data = json.loads(result.stdout)
         
         info = {
